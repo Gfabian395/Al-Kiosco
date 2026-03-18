@@ -1,0 +1,17 @@
+.cart {
+  position: fixed;
+  right: 10px;
+  bottom: 10px;
+  width: 250px;
+  background: #111;
+  color: #fff;
+  padding: 15px;
+  border-radius: 10px;
+  z-index: 1000;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}

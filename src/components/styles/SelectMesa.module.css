@@ -1,0 +1,32 @@
+.container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.mesa {
+  padding: 10px 15px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  background-color: #2c2a36;
+  color: #fff;
+  transition: 0.2s;
+}
+
+.mesa:hover {
+  transform: scale(1.05);
+}
+
+.selected {
+  background-color: #f9b02d;
+  color: #000;
+}
+
+.ocupada {
+  background-color: #555;
+  color: #ccc;
+  cursor: not-allowed;
+}
