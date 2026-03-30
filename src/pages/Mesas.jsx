@@ -408,7 +408,7 @@ export const Mesas = () => {
       {/* <main className={styles.main}>
         <SelectMesa />
       </main> */}
-
+ 
       {/* MODAL */}
       {modalOpen && (
         <div className={styles.modalOverlay} onClick={cerrarModal}>
