@@ -161,7 +161,7 @@ export const Inicio = () => {
           <Loader />
           <p className={styles.loadingText}>
             Guardando categoría...
-          </p>
+          </p> 
         </div>
       )}
     </>

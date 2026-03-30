@@ -78,7 +78,7 @@ const NavBar = ({ role }) => {
             style={{
               backgroundColor: "transparent",
               border: "none",
-              outline: "none",
+              outline: "none", 
               padding: 0,
               margin: 0,
             }}
