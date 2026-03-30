@@ -1,0 +1,243 @@
+/* 🔥 LAYOUT GENERAL */
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 18px;
+  border-radius: 16px;
+  height: 100%;
+  position: relative;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* 🔹 SECCIONES */
+.section {
+  background: #0f172a;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* 🔹 TITULO */
+.title {
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 12px;
+  color: #e2e8f0;
+  letter-spacing: 0.5px;
+}
+
+/* 🔹 GRID */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+  gap: 12px;
+  background-color: transparent;
+}
+
+/* 🔹 WRAPPER */
+.mesaWrapper {
+  position: relative;
+  background-color: transparent;
+}
+
+/* 🔹 BOTONES DE MESA */
+.mesa {
+  height: 50px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  color: white;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: all 0.25s ease;
+
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+}
+
+/* 🟢 LIBRE */
+.libre {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  width: 100%;
+}
+
+/* 🔴 OCUPADA */
+.ocupada {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  width: 100%;
+}
+
+/* 🖱 HOVER */
+.mesa:hover {
+  transform: translateY(-3px) scale(1.06);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.6);
+}
+
+/* 🔥 CLICK */
+.mesa:active {
+  transform: scale(0.95);
+}
+
+/* ⭐ SELECCIONADA */
+.selected {
+  outline: 3px solid #facc15;
+  box-shadow: 0 0 15px rgba(250, 204, 21, 0.6);
+}
+
+/* ❌ BOTON ELIMINAR */
+.deleteBtn {
+  position: absolute;
+  top: 26%;
+  left: 90%;
+  transform: translate(-50%, -50%);
+
+  background: #ef4444;
+  border: none;
+  color: white;
+  font-size: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-weight: bold;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+}
+
+.deleteBtn:hover {
+  background: #dc2626;
+  transform: scale(1.15);
+}
+
+/* ➕ BOTON AGREGAR */
+.addBtn {
+  position: absolute;
+  bottom: 15px;
+  right: 15px;
+  width: 55px;
+  height: 55px;
+  border-radius: 14px;
+  border: none;
+  font-size: 28px;
+  font-weight: bold;
+  color: white;
+
+  background: linear-gradient(135deg, #f59e0b, #ea580c);
+
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+
+  transition: all 0.25s ease;
+}
+
+.addBtn:hover {
+  transform: scale(1.1) rotate(6deg);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+}
+
+/* 🔥 MODAL OVERLAY */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+/* 🔥 MODAL */
+.modal {
+  background: #0f172a;
+  padding: 22px;
+  border-radius: 16px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: white;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+  animation: fadeIn 0.25s ease;
+}
+
+/* ✨ INPUTS */
+.modal input,
+.modal select {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #1e293b;
+  outline: none;
+  background: #020617;
+  color: white;
+  transition: 0.2s;
+}
+
+.modal input:focus,
+.modal select:focus {
+  border: 1px solid #f59e0b;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
+/* 🔹 ACTIONS */
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* BOTONES */
+.actions button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: 0.2s;
+}
+
+/* GUARDAR */
+.actions button:first-child {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+}
+
+.actions button:first-child:hover {
+  transform: scale(1.05);
+}
+
+/* CANCELAR */
+.actions button:last-child {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  color: white;
+}
+
+.actions button:last-child:hover {
+  transform: scale(1.05);
+}
+
+/* ✨ ANIMACION */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

@@ -1,0 +1,78 @@
+.container {
+  padding: 20px;
+  color: #222; /* texto oscuro para contrastar con naranja */
+  margin-top: 100px;
+}
+
+/* 🔥 TÍTULO */
+.title {
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 15px;
+  color: #111;
+}
+
+/* 🔥 TOTAL GENERAL (bien visible) */
+.totalBox {
+  background: #111;
+  color: #fff;
+  padding: 15px;
+  border-radius: 12px;
+  font-weight: 800;
+  margin-bottom: 20px;
+  text-align: center;
+  font-size: 18px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+/* 🔥 LISTA */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 🔥 CARD (blanca para contrastar con naranja) */
+.card {
+  padding: 14px;
+  border-radius: 12px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+  transition: 0.2s;
+  border: solid 2px black;
+}
+
+.card:hover {
+  transform: scale(1.02);
+}
+
+/* 🔥 FILA PRINCIPAL */
+.row {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 16px;
+  color: #111;
+}
+
+/* 🔥 PRECIO */
+.total {
+  color: black; /* naranja fuerte */
+  font-weight: 800;
+}
+
+/* 🔥 INFO SECUNDARIA */
+.info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: black;
+  margin-top: 6px;
+}
+
+/* 🔥 VACÍO */
+.empty {
+  text-align: center;
+  color: #333;
+  font-weight: 500;
+  margin-top: 20px;
+}

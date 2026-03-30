@@ -1,0 +1,306 @@
+.categoryContainer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 100px;
+}
+
+/* 🔴 BOTÓN + */
+.fab {
+  position: fixed;
+  bottom: 25px;
+  right: 25px;
+  width: 65px;
+  height: 65px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff4a4a, #ff7a18);
+  color: white;
+  font-size: 34px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.35);
+  z-index: 10;
+  transition: all 0.25s ease;
+}
+
+.fab:hover {
+  transform: scale(1.1) rotate(10deg);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* 🔥 OVERLAY */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1001;
+  animation: fadeIn 0.25s ease;
+}
+
+/* 🔥 MODAL */
+.modalContent {
+  background: #1e1e2f;
+  color: #fff;
+  padding: 25px;
+  border-radius: 20px;
+  min-width: 320px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  animation: scaleIn 0.25s ease;
+}
+
+/* 🧾 TITULO */
+.modalContent h2 {
+  margin-bottom: 15px;
+  font-size: 22px;
+  text-align: center;
+}
+
+/* 📝 INPUTS */
+.modalContent input[type="text"] {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+  margin-top: 10px;
+  background: #2c2c3e;
+  color: #fff;
+  font-size: 14px;
+  transition: 0.2s;
+}
+
+.modalContent input[type="text"]:focus {
+  background: #383856;
+  box-shadow: 0 0 0 2px #ff4a4a;
+}
+
+/* 📸 FILE INPUT */
+.modalContent input[type="file"] {
+  margin-top: 15px;
+  color: #ccc;
+}
+
+/* 🔘 BOTONES */
+.modalContent button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  margin-top: 15px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
+}
+
+/* ✔ GUARDAR */
+.modalContent button:first-of-type {
+  background: linear-gradient(135deg, #ff4a4a, #ff7a18);
+  color: white;
+}
+
+.modalContent button:first-of-type:hover {
+  transform: scale(1.05);
+}
+
+/* ❌ CANCELAR */
+.modalContent button:last-of-type {
+  background: #444;
+  color: #ddd;
+}
+
+.modalContent button:last-of-type:hover {
+  background: #666;
+}
+
+/* 🔲 CONTENEDOR BOTONES */
+.modalContent div {
+  display: flex;
+  gap: 10px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+  background-color: transparent;
+}
+
+.loadingOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  z-index: 2000;
+}
+
+.loadingText {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ✨ ANIMACIONES */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ================== RESPONSIVE COMPLETO CATEGORÍAS ================== */
+
+/* Desktop >1024px (4 por fila) */
+@media (min-width: 1025px) {
+ /*  .categoryContainer>* {
+    flex: 0 0 23%;
+    aspect-ratio: 1 / 1;
+    margin-bottom: 15px;
+  } */
+
+  .categoryContainer>* img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}
+
+/* Tablets 768px - 1024px (3 por fila) */
+@media (min-width: 768px) and (max-width: 1024px) {
+ /*  .categoryContainer>* {
+    flex: 0 0 32%;
+    aspect-ratio: 1 / 1;
+    margin-bottom: 12px;
+  } */
+
+  .categoryContainer>* img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}
+
+/* Móviles 481px - 767px (2 por fila) */
+@media (min-width: 481px) and (max-width: 767px) {
+/*   .categoryContainer {
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 10px;
+    margin-top: 100px;
+  } */
+
+  .categoryContainer>* {
+    flex: 0 0 48%;
+    aspect-ratio: 1 / 1;
+    margin-bottom: 10px;
+  }
+
+  .categoryContainer>* img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+/* Smartphones ≤480px (2 por fila) */
+@media (max-width: 480px) {
+  /* .categoryContainer {
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 8px;
+    margin-top: 100px;
+  } */
+
+  .categoryContainer>* {
+    flex: 0 0 48%;
+    aspect-ratio: 1 / 1;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: #222;
+    width: 300px;
+    height: 250px;
+  }
+
+  .categoryContainer>* img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 0;
+  }
+
+  .categoryContainer>* h3 {
+    text-align: center;
+    margin-top: 5px;
+    font-size: 14px;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  /* FAB más pequeño */
+  .fab {
+    width: 45px;
+    height: 45px;
+    font-size: 24px;
+    bottom: 15px;
+    right: 15px;
+  }
+
+  /* Modal más estrecho */
+  .modalContent {
+    min-width: unset;
+    width: 95%;
+    max-width: 300px;
+    padding: 18px;
+  }
+
+  .modalContent h2 {
+    font-size: 18px;
+  }
+
+  .modalContent input[type="text"],
+  .modalContent input[type="file"] {
+    font-size: 14px;
+    padding: 12px;
+  }
+
+  .modalContent button {
+    padding: 10px;
+    font-size: 13px;
+  }
+}

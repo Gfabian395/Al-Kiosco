@@ -1,0 +1,247 @@
+.container {
+  position: relative;
+  width: 250px;
+  height: 250px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #26242e;
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+/* Overlay para el título */
+.overlay {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(to top,
+      rgba(0, 0, 0, 0.9),
+      rgba(0, 0, 0, 0.5),
+      transparent);
+  display: flex;
+  justify-content: center;
+}
+
+/* Titulo */
+.title {
+  font-family: "Agbalumo", system-ui;
+  font-weight: 400;
+  font-style: normal;
+  color: #fff;
+  font-size: 20px;
+  text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.8);
+  letter-spacing: 1px;
+  background-color: transparent;
+}
+
+/* Botones arriba */
+.topButtons {
+  position: absolute;
+  top: 8px;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 8px;
+  pointer-events: none;
+  /* para que no interfiera con click en imagen */
+  background-color: transparent;
+}
+
+.topButtons button {
+  pointer-events: auto;
+  /* para que los botones sean clickeables */
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: transform 0.2s ease;
+  height: 30px;
+  width: 30px;
+}
+
+.topButtons button:hover {
+  transform: scale(1.1);
+}
+
+.editBtn {
+  background-color: rgba(76, 175, 80, 0.85);
+  color: #fff;
+}
+
+.deleteBtn {
+  background-color: rgba(244, 67, 54, 0.85);
+  color: #fff;
+}
+
+/* Hover imagen */
+.container:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+.container:hover img {
+  transform: scale(1.1);
+}
+
+/* Edit container */
+.editContainer {
+  position: relative;
+  padding: 12px;
+  background: #26242e;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: "Poppins", sans-serif;
+  color: #fff;
+}
+
+.editContainer input[type="text"],
+.editContainer input[type="file"] {
+  border-radius: 8px;
+  border: 1px solid #555;
+  padding: 6px 10px;
+  background: #1e1c26;
+  color: #fff;
+  font-size: 14px;
+}
+
+.editActions {
+  display: flex;
+  gap: 8px;
+  background-color: transparent;
+}
+
+.editActions button {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.editActions button:first-child {
+  background-color: #4caf50;
+  color: #fff;
+}
+
+.editActions button:last-child {
+  background-color: #f44336;
+  color: #fff;
+}
+
+/* 🔥 MODAL */
+.editModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 15px;
+}
+
+/* 🧾 CONTENIDO */
+.editContent {
+  width: 100%;
+  max-width: 350px;
+  background: #1e1e2f;
+  border-radius: 15px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: white;
+  position: relative;
+  animation: fadeIn 0.25s ease;
+}
+
+/* ❌ cerrar */
+.closeEdit {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* inputs */
+.editContent input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+
+/* botones */
+.editActions {
+  display: flex;
+  gap: 10px;
+}
+
+.editActions button:first-child {
+  flex: 1;
+  background: #27ae60;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.editActions button:last-child {
+  flex: 1;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+/* animación */
+@keyframes fadeIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .container {
+    width: 100%;
+    height: 140px;
+  }
+
+  .title {
+    font-size: 16px;
+  }
+
+  .topButtons {
+    top: 30px;
+  
+  }
+}

@@ -1,0 +1,21 @@
+* {
+  background-color: orange;
+}
+
+.cart {
+  position: fixed;
+  right: 10px;
+  bottom: 10px;
+  width: 250px;
+  background: #111;
+  color: #fff;
+  padding: 15px;
+  border-radius: 10px;
+  z-index: 1000; /* que esté por encima de otros elementos */
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
