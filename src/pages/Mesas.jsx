@@ -4,6 +4,7 @@ import { auth, db } from "../firebase";
 import SelectMesa from "../components/SelectMesa";
 import { useCart } from "../context/CartContext";
 import styles from "../components/styles/Mesas.module.css";
+import { onAuthStateChanged } from "firebase/auth"; // 🔥 arriba del archivo
 
 export const Mesas = () => {
   const [mesas, setMesas] = useState([]);
@@ -16,7 +17,7 @@ export const Mesas = () => {
   const [role, setRole] = useState(null);
   const [pago, setPago] = useState("");
   const [vuelto, setVuelto] = useState(0);
-
+  const [userReady, setUserReady] = useState(false);
   const abrirModal = (mesa) => {
     setMesaSeleccionada(mesa);
     setModalOpen(true);
@@ -49,38 +50,72 @@ export const Mesas = () => {
   };
 
   const abrirPago = () => {
+    setModalOpen(false); // 🔥 cerrar modal anterior
     setModalPagoOpen(true);
   };
 
-  useEffect(() => {
-    const total = mesaSeleccionada?.total || 0;
-    const pagoNum = parseFloat(pago) || 0;
-    setVuelto(pagoNum - total);
-  }, [pago, mesaSeleccionada]);
 
   useEffect(() => {
-    const obtenerRol = async () => {
-      const user = auth.currentUser;
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) return;
 
       try {
-        const docRef = doc(db, "usuarios", user.uid);
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const userRole = docSnap.data().role;
+          console.log("ROLE:", userRole);
+          setRole(userRole);
+        }
+      } catch (error) {
+        console.error("Error obteniendo rol:", error);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+
+      try {
+        const docRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
           setRole(docSnap.data().role);
         }
+
+        setUserReady(true); // 🔥 CLAVE
       } catch (error) {
         console.error("Error obteniendo rol:", error);
       }
-    };
+    });
 
-    obtenerRol();
+    return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const total = mesaSeleccionada?.total || 0;
+    const pagoNum = parseFloat(pago) || 0;
+
+    const calculo = pagoNum - total;
+    setVuelto(calculo > 0 ? calculo : 0);
+  }, [pago, mesaSeleccionada]);
+  
   // 🟢 COBRAR
   const confirmarCobro = async () => {
     if (!mesaSeleccionada) return;
+
+    const total = mesaSeleccionada.total || 0;
+    const pagoNum = parseFloat(pago) || 0;
+
+    if (pagoNum < total) {
+      alert("El monto es insuficiente");
+      return;
+    }
 
     try {
       const pedidoRef = collection(db, "mesas", mesaSeleccionada.id, "pedido");
@@ -138,7 +173,15 @@ export const Mesas = () => {
     }
   };
 
+  const cerrarPago = () => {
+    setModalPagoOpen(false);
+    setPago("");
+    setVuelto(0);
+  };
+
   useEffect(() => {
+    if (!userReady) return; // 🔥 BLOQUEA ejecución
+
     const ref = collection(db, "mesas");
 
     const unsubscribe = onSnapshot(ref, (snapshot) => {
@@ -184,7 +227,7 @@ export const Mesas = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [userReady]); // 🔥 DEPENDENCIA
 
   const mesasOrdenadas = [...mesas].sort((a, b) => {
     const sectorA = a.sector?.toLowerCase() || "";
@@ -388,7 +431,7 @@ export const Mesas = () => {
                         🧾 Enviar pedido
                       </button>
 
-                      {role && role !== "mozo" && (
+                      {(role?.toLowerCase().trim() === "jefe" || role?.toLowerCase().trim() === "cajero") && (
                         <button
                           className={styles.payBtn}
                           onClick={() => abrirModal(mesa)}
@@ -408,9 +451,9 @@ export const Mesas = () => {
       {/* <main className={styles.main}>
         <SelectMesa />
       </main> */}
- 
+
       {/* MODAL */}
-      {modalOpen && (
+      {modalOpen && (role?.toLowerCase().trim() === "jefe" || role?.toLowerCase().trim() === "cajero") && (
         <div className={styles.modalOverlay} onClick={cerrarModal}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <h2>¿Qué querés hacer?</h2>
@@ -436,7 +479,7 @@ export const Mesas = () => {
 
       {/* MODAL PAGO */}
       {modalPagoOpen && (
-        <div className={styles.modalOverlay} onClick={() => setModalPagoOpen(false)}>
+        <div className={styles.modalOverlay} onClick={cerrarPago}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <h2>Total: {formatARS(mesaSeleccionada?.total)}</h2>
 
@@ -453,7 +496,7 @@ export const Mesas = () => {
 
             <div className={styles.actions}>
               <button onClick={confirmarCobro}>Confirmar cobro</button>
-              <button onClick={() => setModalPagoOpen(false)}>Cancelar</button>
+              <button onClick={cerrarPago}>Cancelar</button>
             </div>
           </div>
         </div>

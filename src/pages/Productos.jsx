@@ -77,7 +77,7 @@ export const Productos = () => {
       const user = auth.currentUser;
       if (!user) return;
 
-      const docRef = doc(db, "usuarios", user.uid);
+      const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {

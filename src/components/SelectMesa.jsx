@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, addDoc, deleteDoc, getDocs, doc } from "firebase/firestore";
-import { db } from "../firebase";
+import { collection, onSnapshot, addDoc, deleteDoc, getDocs, doc, getDoc } from "firebase/firestore";
+import { db, auth } from "../firebase";
 import { useCart } from "../context/CartContext";
+import { onAuthStateChanged } from "firebase/auth";
 import styles from "./styles/SelectMesa.module.css";
 
 const SelectMesa = () => {
@@ -11,6 +12,28 @@ const SelectMesa = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [numero, setNumero] = useState("");
   const [sector, setSector] = useState("adentro");
+
+  const [role, setRole] = useState(null);
+
+  // 🔥 TRAER ROLE
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+
+      try {
+        const ref = doc(db, "users", user.uid);
+        const snap = await getDoc(ref);
+
+        if (snap.exists()) {
+          setRole(snap.data().role);
+        }
+      } catch (error) {
+        console.error("Error obteniendo rol:", error);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // 🔹 Traer mesas en tiempo real
   useEffect(() => {
@@ -32,12 +55,11 @@ const SelectMesa = () => {
   const mesasAdentro = mesas.filter((m) => m.sector === "adentro");
   const mesasAfuera = mesas.filter((m) => m.sector === "afuera");
 
-  // 🔹 Agregar mesa con validación
+  // 🔹 Agregar mesa
   const handleAddMesa = async () => {
     if (!numero) return alert("Poné un número de mesa");
 
     try {
-      // 🔥 validar que no exista
       const snapshot = await getDocs(collection(db, "mesas"));
       const existe = snapshot.docs.find(
         (doc) =>
@@ -94,9 +116,9 @@ const SelectMesa = () => {
               ${m.ocupada ? styles.ocupada : styles.libre}`}
               onClick={() => {
                 if (mesaId === m.id) {
-                  setMesa(null);      // 🔥 resetea
+                  setMesa(null);
                   setTimeout(() => {
-                    setMesa(m.id);    // 🔥 vuelve a setear → dispara el useEffect
+                    setMesa(m.id);
                   }, 0);
                 } else {
                   setMesa(m.id);
@@ -106,13 +128,15 @@ const SelectMesa = () => {
               {m.numero}
             </button>
 
-            {/* 🔥 BOTÓN ELIMINAR */}
-            <button
-              className={styles.deleteBtn}
-              onClick={() => handleDeleteMesa(m.id)}
-            >
-              ✕
-            </button>
+            {/* 🔥 ELIMINAR SOLO JEFE */}
+            {role?.toLowerCase().trim() === "jefe" && (
+              <button
+                className={styles.deleteBtn}
+                onClick={() => handleDeleteMesa(m.id)}
+              >
+                ✕
+              </button>
+            )}
 
           </div>
         ))}
@@ -126,13 +150,15 @@ const SelectMesa = () => {
         {renderMesas(mesasAdentro, "adentro")}
         {renderMesas(mesasAfuera, "afuera")}
 
-        {/* 🔥 BOTON + BIEN POSICIONADO */}
-        <button
-          className={styles.addBtn}
-          onClick={() => setModalOpen(true)}
-        >
-          +
-        </button>
+        {/* 🔥 SOLO JEFE CREA MESAS */}
+        {role?.toLowerCase().trim() === "jefe" && (
+          <button
+            className={styles.addBtn}
+            onClick={() => setModalOpen(true)}
+          >
+            +
+          </button>
+        )}
       </div>
 
       {/* 🔥 MODAL */}

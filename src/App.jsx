@@ -25,6 +25,8 @@ function App() {
 
           console.log("USER:", firebaseUser);
           console.log("ROLE:", userDoc.data()?.role);
+          console.log("EXISTS:", userDoc.exists());
+          console.log("DATA:", userDoc.data());
 
           setUser(firebaseUser);
           setRole(userDoc.data()?.role || null);
