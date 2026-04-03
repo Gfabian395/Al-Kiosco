@@ -346,7 +346,7 @@ h2 {
 @media (max-width: 480px) {
   .container {
     width: 48%;          /* 2 por fila */
-    height: 420px;       /* más compacto */
+    height: 450px;       /* más compacto */
     border-radius: 15px;
   }
 
@@ -358,7 +358,7 @@ h2 {
 
   /* contenido más compacto */
   .contentBox {
-    height: 180px;
+    height: 250px;
     padding: 10px;
     gap: 4px;
   }

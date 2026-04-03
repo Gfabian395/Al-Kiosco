@@ -378,6 +378,7 @@
   /* Productos */
   .productosPanel {
     padding: 10px;
+    margin-top: 10px;
   }
 
   .productContainer {
@@ -440,9 +441,17 @@
   .mesasPanel {
     display: flex;
     flex-direction: column;
-    /* 🔥 clave */
     padding: 10px;
     gap: 10px;
+
+    /* 🔥 CLAVE */
+    max-height: 40vh;
+    /* ocupa solo 40% de la pantalla */
+    overflow-y: auto;
+    /* scroll vertical */
+
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 
   /* cada mesa más compacta */

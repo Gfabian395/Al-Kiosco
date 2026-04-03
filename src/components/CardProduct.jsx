@@ -125,8 +125,8 @@ const CardProduct = ({
             {/* PRECIO + AGREGAR */}
             <div className={styles.btn}>
               <h2>{formatARS(total)}</h2>
-              <button onClick={handleAdd}>Agregar</button>
             </div>
+              <button onClick={handleAdd}>Agregar</button>
           </>
         </div>
       </div>
