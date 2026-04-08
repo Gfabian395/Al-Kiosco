@@ -73,8 +73,8 @@ export const CartProvider = ({ children }) => {
         const current = exist.data();
 
         await updateDoc(itemRef, {
-          quantity: current.quantity + 1,
-          total: current.total + product.price,
+          quantity: current.quantity + qty,
+          total: current.total + product.price * qty,
         });
       } else {
         await addDoc(pedidoRef, {

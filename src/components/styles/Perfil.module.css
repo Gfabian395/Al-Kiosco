@@ -1,0 +1,140 @@
+/* ================================
+   CONTENEDOR
+================================ */
+.container {
+  padding: 1.5rem;
+  display: grid;
+  gap: 1.5rem;
+  max-width: 900px;
+  margin: auto;
+}
+
+/* ================================
+   TITULOS
+================================ */
+.title {
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+/* ================================
+   SECCIONES (cards)
+================================ */
+.card {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(10px);
+  border-radius: 14px;
+  padding: 1.2rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+/* ================================
+   INFO USER
+================================ */
+.infoRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.label {
+  opacity: 0.7;
+}
+
+.value {
+  font-weight: 500;
+}
+
+/* ================================
+   CAJA
+================================ */
+.caja {
+  text-align: center;
+}
+
+.total {
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin-top: 0.5rem;
+}
+
+/* ================================
+   TURNO
+================================ */
+.turnoActivo {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.turnoInactivo {
+  color: #9ca3af;
+}
+
+.turnoData {
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+}
+
+/* ================================
+   BOTONES
+================================ */
+.actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  flex: 1;
+  padding: 0.7rem;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.2s;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* INICIAR */
+.start {
+  background: #22c55e;
+  color: white;
+}
+
+.start:hover {
+  background: #16a34a;
+}
+
+/* FINALIZAR */
+.end {
+  background: #ef4444;
+  color: white;
+}
+
+.end:hover {
+  background: #dc2626;
+}
+
+/* ================================
+   MOBILE
+================================ */
+@media (max-width: 600px) {
+  .container {
+    padding: 1rem;
+  }
+
+  .total {
+    font-size: 1.5rem;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+}

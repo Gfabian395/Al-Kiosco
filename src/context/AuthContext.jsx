@@ -20,7 +20,6 @@ export const AuthProvider = ({ children }) => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       setUser(result.user);
-      console.log("Usuario logueado:", result.user.email);
     } catch (err) {
       console.error("Error en login:", err);
     }

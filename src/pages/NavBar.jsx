@@ -72,13 +72,17 @@ const NavBar = ({ role }) => {
           Mesas
         </a>
 
+        <a href="/perfil" style={{ "--i": 1 }} onClick={handleLinkClick}>
+          Perfil
+        </a>
+
         <a href="#" onClick={handleLogout} style={{ "--i": 4 }}>
           <i
             className="bx bx-log-out"
             style={{
               backgroundColor: "transparent",
               border: "none",
-              outline: "none", 
+              outline: "none",
               padding: 0,
               margin: 0,
             }}

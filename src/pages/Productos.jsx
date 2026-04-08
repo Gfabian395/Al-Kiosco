@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { collection, getDocs, getDoc, addDoc, doc, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, getDoc, addDoc, doc, onSnapshot, updateDoc, runTransaction } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage, auth } from "../firebase";
 import CardProduct from "../components/CardProduct";
@@ -28,7 +28,7 @@ export const Productos = () => {
   const [modalCobroOpen, setModalCobroOpen] = useState(false);
   const [modalProductOpen, setModalProductOpen] = useState(false);
   const [role, setRole] = useState(null);
-
+  const [userData, setUserData] = useState(null);
   // 🔥 NUEVO
   const [modalPagoOpen, setModalPagoOpen] = useState(false);
   const [pago, setPago] = useState("");
@@ -73,7 +73,7 @@ export const Productos = () => {
   }, [mesaId]);
 
   useEffect(() => {
-    const obtenerRol = async () => {
+    const obtenerUsuario = async () => {
       const user = auth.currentUser;
       if (!user) return;
 
@@ -81,11 +81,13 @@ export const Productos = () => {
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        setRole(docSnap.data().role);
+        const data = docSnap.data();
+        setRole(data.role);
+        setUserData(data); // 🔥 GUARDÁS TODO
       }
     };
 
-    obtenerRol();
+    obtenerUsuario(); // ✅ acá estaba el error
   }, []);
 
   const handleSelectMesa = () => {
@@ -93,7 +95,24 @@ export const Productos = () => {
   };
 
   useEffect(() => {
-    fetchProducts();
+    const productsRef = collection(
+      db,
+      "categories",
+      categoryId,
+      "products"
+    );
+
+    const unsubscribe = onSnapshot(productsRef, (snapshot) => {
+      const prods = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      setProducts(prods);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [categoryId]);
 
   // 🔥 traer datos mesa
@@ -132,8 +151,8 @@ export const Productos = () => {
   const handleSaveProduct = async () => {
     if (saving) return;
 
-    if (!name || !description || !price) {
-      alert("Completá los campos obligatorios");
+    if (!name || !price) {
+      alert("Nombre y precio son obligatorios");
       return;
     }
 
@@ -158,6 +177,7 @@ export const Productos = () => {
         ingredients,
         price: parseFloat(price),
         image: imageUrl,
+        stock: 0, // 👈 IMPORTANTE
       };
 
       const productsRef = collection(
@@ -188,8 +208,43 @@ export const Productos = () => {
   const closeCobroModal = () => setModalCobroOpen(false);
 
   const handleLiberar = async () => {
-    await clearMesa(false);
-    closeCobroModal();
+    if (!mesaData) return;
+
+    try {
+      // 🔹 Armar items desde el carrito
+      const items = cart.map((p) => ({
+        id: p.id || null,
+        categoryId: p.categoryId || null,
+        name: p.name || "",
+        price: p.price || 0,
+        quantity: p.quantity || 1,
+        total: p.total || (p.price * (p.quantity || 1)),
+      }));
+
+      const now = new Date();
+
+      // 🟢 GUARDAR EN mesasLiberadas
+      await addDoc(collection(db, "mesasLiberadas"), {
+        mesa: mesaData?.numero ?? "Sin mesa",
+        sector: mesaData?.sector ?? "Sin sector",
+        total: total ?? 0,
+        pago: parseFloat(pago) || 0,
+        vuelto: vuelto ?? 0,
+        fecha: now.toLocaleDateString("es-AR"),
+        hora: now.toLocaleTimeString("es-AR"),
+        items: items ?? [],
+        userId: auth.currentUser?.uid ?? null,
+        userName: userData?.name ?? "Empleado",
+        createdAt: new Date(),
+      });
+
+      // 🔥 limpiar mesa
+      await clearMesa(false);
+
+      closeCobroModal();
+    } catch (error) {
+      console.error("Error liberando mesa:", error);
+    }
   };
 
   // 🔥 NUEVO → abrir paso de pago
@@ -208,38 +263,187 @@ export const Productos = () => {
     if (!mesaData) return;
 
     try {
-      // 🔹 Crear array de items con detalle
+      // 🔥 VALIDACIÓN ANTES (EVITA ERRORES)
+      for (const item of cart) {
+        const product = products.find(p => p.id === item.id);
+        const quantity = Number(item.quantity ?? 1);
+
+        if (product && quantity > (product.stock ?? 0)) {
+          alert(`No hay suficiente stock de ${item.name}`);
+          return;
+        }
+      }
+
+      // 🔹 Crear array de items con detalle seguro
       const items = cart.map((p) => ({
-        name: p.name,
-        price: p.price,
-        quantity: p.quantity || 1,
-        total: p.total || (p.price * (p.quantity || 1)),
+        id: p.id ?? null,
+        categoryId: p.categoryId ?? null,
+        name: p.name ?? "",
+        price: Number(p.price ?? 0),
+        quantity: Number(p.quantity ?? 1),
+        total: Number(p.total ?? (p.price ?? 0) * (p.quantity ?? 1)),
       }));
 
       const now = new Date();
 
+      // 🔥 DESCONTAR STOCK (SEGURO)
+      for (const item of cart) {
+        const productId = item.id ?? null;
+        const categoryId = item.categoryId ?? null;
+        const quantity = Number(item.quantity ?? 1);
+
+        if (!productId || !categoryId) continue;
+
+        const productRef = doc(db, "categories", categoryId, "products", productId);
+
+        await runTransaction(db, async (transaction) => {
+          const snap = await transaction.get(productRef);
+
+          if (!snap.exists()) {
+            console.warn("Producto no encontrado para stock:", item);
+            return;
+          }
+
+          const currentStock = Number(snap.data().stock ?? 0);
+
+          if (quantity > currentStock) {
+            throw new Error(`Sin stock suficiente de ${item.name}`);
+          }
+
+          const newStock = currentStock - quantity;
+
+          transaction.update(productRef, { stock: newStock });
+          console.log(`Stock actualizado ${item.name}: ${currentStock} → ${newStock}`);
+        });
+      }
+
+      // 🔥 GUARDAR COBRO
       await addDoc(collection(db, "cobros"), {
-        mesa: mesaData.numero,
-        sector: mesaData.sector,
-        total,
-        pago: parseFloat(pago),
-        vuelto,
+        mesa: mesaData.numero ?? "Sin mesa",
+        sector: mesaData.sector ?? "Sin sector",
+        total: Number(total ?? 0),
+        pago: parseFloat(pago ?? 0),
+        vuelto: Number(vuelto ?? 0),
         fecha: now.toLocaleDateString("es-AR"),
         hora: now.toLocaleTimeString("es-AR"),
-        items, // 🔥 detalle de productos
+        items: items ?? [],
+        userId: auth.currentUser?.uid ?? null,
+        userName: userData?.name ?? "Empleado",
+        createdAt: new Date(),
       });
 
-      // 🔹 Limpiar mesa y UI
       await clearMesa(true);
+
       setModalPagoOpen(false);
       closeCobroModal();
       setPago("");
       setVuelto(0);
+
+      alert("✅ Cobrado y stock actualizado");
     } catch (error) {
       console.error("Error cobrando:", error);
-      alert("Error al cobrar");
+
+      if (error.message?.includes("Sin stock")) {
+        alert(error.message);
+      } else {
+        alert("Error al cobrar");
+      }
     }
   };
+
+  // 🔹 Función para imprimir tickets de mesas
+// 🔹 Función para imprimir tickets de mesas (usando cart)
+const imprimirTicket = (mesa, cartItems) => {
+  const ventana = window.open("", "PRINT", "height=600,width=300");
+  const ahora = new Date().toLocaleString();
+
+  const ticketCocina = `
+    <div class="ticket">
+      <h2>👨‍🍳 COCINA</h2>
+      <h3>Mesa ${mesa.numero}</h3>
+      <p>${mesa.sector}</p>
+      <p>${ahora}</p>
+      <hr/>
+      ${cartItems
+        .map(
+          (p) => `
+            <div class="item">
+              <span>${p.name}</span>
+              <span>x${p.quantity || 1}</span>
+            </div>
+          `
+        )
+        .join("")}
+      <hr/>
+      <p style="text-align:center;">---------------------------</p>
+    </div>
+  `;
+
+  const ticketCaja = `
+    <div class="ticket">
+      <h2>💰 CAJA</h2>
+      <h3>Mesa ${mesa.numero}</h3>
+      <p>${mesa.sector}</p>
+      <p>${ahora}</p>
+      <hr/>
+      ${cartItems
+        .map(
+          (p) => `
+            <div class="item">
+              <span>${p.name} x${p.quantity}</span>
+              <span>$${p.total}</span>
+            </div>
+          `
+        )
+        .join("")}
+      <div class="total">TOTAL: $${cartItems.reduce((acc, p) => acc + (p.total || 0), 0)}</div>
+      <p style="text-align:center;">---------------------------</p>
+    </div>
+  `;
+
+  const contenido = `
+    <html>
+      <head>
+        <title>Ticket</title>
+        <style>
+          body { font-family: monospace; width: 220px; padding: 5px; }
+          .ticket { margin-bottom: 20px; }
+          h2, h3, p { margin: 4px 0; text-align: center; }
+          .item { display: flex; justify-content: space-between; font-size: 12px; }
+          .total { border-top: 1px dashed black; margin-top: 10px; padding-top: 5px; font-size: 16px; text-align: center; }
+          hr { border: none; border-top: 1px dashed black; margin: 5px 0; }
+        </style>
+      </head>
+      <body>
+        ${ticketCocina}
+        ${ticketCaja}
+      </body>
+    </html>
+  `;
+
+  ventana.document.write(contenido);
+  ventana.document.close();
+  ventana.focus();
+
+  setTimeout(() => {
+    ventana.print();
+    ventana.close();
+  }, 500);
+};
+
+// 🔹 Función para enviar pedido
+// 🔹 Función para enviar pedido
+const enviarPedido = async (mesa) => {
+  if (!mesa) return alert("No hay mesa seleccionada");
+
+  try {
+    imprimirTicket(mesa, cart); // 🔹 PASAR EL CARRITO AQUÍ
+    alert(`Pedido enviado para Mesa ${mesa.numero}`);
+  } catch (error) {
+    console.error("Error enviando pedido:", error);
+    alert("Error enviando pedido");
+  }
+};
 
   if (loading) return <p>Cargando productos...</p>;
 
@@ -251,15 +455,13 @@ export const Productos = () => {
           {/* 🔥 CARRITO AHORA ABAJO */}
           {mesaId && cartVisible && (
             <div className={`${styles.cartPanel} ${styles.cartFloating}`}>
-
-              {/* 🔥 HEADER CON BOTÓN CERRAR */}
+              {/* HEADER */}
               <div className={styles.cartHeader}>
                 <h3>
                   {mesaData
                     ? `Mesa ${mesaData.numero} (${mesaData.sector})`
                     : "Seleccioná una mesa"}
                 </h3>
-
                 <button
                   className={styles.closeCart}
                   onClick={() => setCartVisible(false)}
@@ -271,32 +473,49 @@ export const Productos = () => {
               {!mesaId && <p>Seleccioná una mesa</p>}
               {mesaId && cart.length === 0 && <p>Sin productos</p>}
 
+              {/* ITEMS */}
               {cart.map((p) => (
                 <div key={p.id} className={styles.cartItem}>
                   <span>{p.name}</span>
-
                   <div className={styles.cartControls}>
                     <button onClick={() => removeFromCart(p.id)}>-</button>
                     <span>{p.quantity}</span>
-                    <button onClick={() => addToCart(p)}>+</button>
+                    <button
+                      onClick={() => {
+                        const product = products.find(prod => prod.id === p.id);
+                        if (product && p.quantity >= (product.stock || 0)) {
+                          alert("No hay más stock disponible");
+                          return;
+                        }
+                        addToCart(p);
+                      }}
+                    >
+                      +
+                    </button>
                   </div>
-
                   <span>{formatARS(p.total)}</span>
                 </div>
               ))}
 
-              {mesaId && (
+              {/* TOTAL Y BOTONES */}
+              {mesaId && cart.length > 0 && (
                 <>
                   <h4>Total: {formatARS(total)}</h4>
 
+                  {/* COBRAR SOLO SI NO ES MOZO */}
                   {role && role !== "mozo" && (
-                    <button
-                      className={styles.payBtn}
-                      onClick={openCobroModal}
-                    >
+                    <button className={styles.payBtn} onClick={openCobroModal}>
                       💰 Cobrar / Liberar mesa
                     </button>
                   )}
+
+                  {/* ENVIAR PEDIDO PARA TODOS */}
+                  <button
+                    className={styles.sendBtn}
+                    onClick={() => enviarPedido(mesaData)}
+                  >
+                    🧾 Enviar pedido
+                  </button>
                 </>
               )}
             </div>
@@ -311,12 +530,14 @@ export const Productos = () => {
             {products.map((prod) => (
               <CardProduct
                 key={prod.id}
+                id={prod.id} // 🔥 FALTABA
+                categoryId={categoryId} // 🔥 FALTABA
                 name={prod.name}
                 description={prod.description}
                 ingredients={prod.ingredients}
                 price={prod.price}
                 image={prod.image}
-                onAdd={() => addToCart(prod)}
+                stock={prod.stock} // 👈 CLAVE
               />
             ))}
           </div>

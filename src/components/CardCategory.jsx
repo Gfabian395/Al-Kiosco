@@ -55,32 +55,31 @@ const CardCategory = ({ id, name, image, onClick = () => { }, onCategoryUpdated 
 
   return (
     <>
-      <div className={styles.container}>
-        {!editing ? (
-          <>
-            {image ? <img src={image} alt={name} onClick={onClick} /> : null}
-
-            <div className={styles.overlay}>
-              <h3 className={styles.title}>{name}</h3>
-            </div>
-
-            <div className={styles.topButtons}>
-              <button
-                className={styles.editBtn}
-                onClick={() => setEditing(true)}
-              >
-                ✎
-              </button>
-              <button
-                className={styles.deleteBtn}
-                onClick={handleDelete}
-              >
-                🗑
-              </button>
-            </div>
-          </>
-        ) : null}
+      <div className={styles.container} onClick={onClick}>
+  {!editing ? (
+    <>
+      {image && <img src={image} alt={name} />}
+      <div className={styles.overlay}>
+        <h3 className={styles.title}>{name}</h3>
       </div>
+
+      <div className={styles.topButtons}>
+        <button
+          className={styles.editBtn}
+          onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+        >
+          ✎
+        </button>
+        <button
+          className={styles.deleteBtn}
+          onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+        >
+          🗑
+        </button>
+      </div>
+    </>
+  ) : null}
+</div>
 
       {/* 🔥 MODAL EDITAR */}
       {editing && (

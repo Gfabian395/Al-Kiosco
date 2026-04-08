@@ -11,6 +11,7 @@ import { Mesas } from "./pages/Mesas";
 import { Finanzas } from "./pages/Finanzas";
 import Login from "./components/Login";
 import Loader from "./components/Loader";
+import { Perfil } from "./pages/Perfil";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -22,12 +23,6 @@ function App() {
       if (firebaseUser) {
         try {
           const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-
-          console.log("USER:", firebaseUser);
-          console.log("ROLE:", userDoc.data()?.role);
-          console.log("EXISTS:", userDoc.exists());
-          console.log("DATA:", userDoc.data());
-
           setUser(firebaseUser);
           setRole(userDoc.data()?.role || null);
         } catch (error) {
@@ -97,6 +92,11 @@ function App() {
         <Route
           path="*"
           element={<Navigate to={user ? "/" : "/login"} replace />}
+        />
+
+        <Route
+          path="/perfil"
+          element={user ? <Perfil /> : <Navigate to="/login" replace />}
         />
       </Routes>
     </>

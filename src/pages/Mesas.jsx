@@ -27,27 +27,61 @@ export const Mesas = () => {
 
   // 🔴 LIBERAR
   const liberarMesa = async () => {
-    if (!mesaSeleccionada) return;
+  if (!mesaSeleccionada) return;
 
-    try {
-      const pedidoRef = collection(db, "mesas", mesaSeleccionada.id, "pedido");
-      const snapshot = await getDocs(pedidoRef);
+  try {
+    const pedidoRef = collection(db, "mesas", mesaSeleccionada.id, "pedido");
+    const snapshot = await getDocs(pedidoRef);
 
-      const deletes = snapshot.docs.map((d) =>
-        deleteDoc(doc(db, "mesas", mesaSeleccionada.id, "pedido", d.id))
-      );
+    let totalReal = 0;
 
-      await Promise.all(deletes);
+    // 🔥 Armar items igual que en cobros
+    const items = snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
 
-      // 🔥 CLAVE
-      await clearMesa(false);
+      const cantidad = data.quantity || data.cantidad || 1;
+      const precio = data.price || data.precio || 0;
+      const total = data.total || precio * cantidad;
 
-      setModalOpen(false);
+      totalReal += total;
 
-    } catch (error) {
-      console.error("Error liberando mesa:", error);
-    }
-  };
+      return {
+        name: data.name || data.nombre,
+        price: precio,
+        quantity: cantidad,
+        total,
+      };
+    });
+
+    const now = new Date();
+
+    // 🟢 GUARDAR EN HISTORIAL (CLAVE)
+    await addDoc(collection(db, "mesasLiberadas"), {
+      mesa: mesaSeleccionada.numero,
+      sector: mesaSeleccionada.sector,
+      items,
+      total: totalReal,
+      fecha: now.toLocaleDateString("es-AR"),
+      hora: now.toLocaleTimeString("es-AR"),
+      estado: "Liberada",
+    });
+
+    // 🔴 BORRAR PEDIDO
+    const deletes = snapshot.docs.map((d) =>
+      deleteDoc(doc(db, "mesas", mesaSeleccionada.id, "pedido", d.id))
+    );
+
+    await Promise.all(deletes);
+
+    // 🔥 limpiar contexto
+    await clearMesa(false);
+
+    setModalOpen(false);
+
+  } catch (error) {
+    console.error("Error liberando mesa:", error);
+  }
+};
 
   const abrirPago = () => {
     setModalOpen(false); // 🔥 cerrar modal anterior
@@ -65,7 +99,6 @@ export const Mesas = () => {
 
         if (docSnap.exists()) {
           const userRole = docSnap.data().role;
-          console.log("ROLE:", userRole);
           setRole(userRole);
         }
       } catch (error) {
@@ -280,7 +313,7 @@ export const Mesas = () => {
         .map(
           (p) => `
             <div class="item">
-              <span>${p.nombre} x${p.quantity}</span>
+              <span>${p.name} x${p.quantity}</span>
               <span>$${p.total}</span>
             </div>
           `
@@ -355,8 +388,6 @@ export const Mesas = () => {
 
   const enviarPedido = async (mesa) => {
     try {
-      // opcional: marcar como enviado en firebase
-      // await updateDoc(...)
 
       imprimirTicket(mesa);
 

@@ -1,44 +1,72 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCart } from "../context/CartContext";
-import { doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { doc, deleteDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import styles from "./styles/CardProduct.module.css";
 
-// 🔹 Asegurate de tener boxicons importados en tu index.html o App
-// <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet' />
-
 const CardProduct = ({
+  categoryId,
   id,
-  name = "Veggie Burguer",
-  description = "Delicious burger",
-  ingredients = "Onion, Lettuce, Tomato, Patty, Cheese",
-  price = 5,
-  image = "https://firebasestorage.googleapis.com/v0/b/al-kiosco.firebasestorage.app/o/products%2F1773621820710-descarga.jpg?alt=media&token=eebd8f3c-3b30-49cc-8a70-ad6901e1b8a2",
+  name,
+  description,
+  ingredients,
+  price,
+  image,
+  stock = 0,
+  role
 }) => {
   const [qty, setQty] = useState(1);
   const [open, setOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [editedName, setEditedName] = useState(name);
-  const [editedDescription, setEditedDescription] = useState(description);
-  const [editedIngredients, setEditedIngredients] = useState(ingredients);
-  const [editedPrice, setEditedPrice] = useState(price);
+
+  const [editedName, setEditedName] = useState(name || "");
+  const [editedDescription, setEditedDescription] = useState(description || "");
+  const [editedIngredients, setEditedIngredients] = useState(ingredients || "");
+  const [editedPrice, setEditedPrice] = useState(price || 0);
+  const [editedStock, setEditedStock] = useState(stock || 0);
+
+  const [currentStock, setCurrentStock] = useState(stock || 0); // stock actualizado en tiempo real
 
   const { mesaId, addToCart } = useCart();
 
-  const total = price * qty;
+  const total = (price || 0) * qty;
   const formatARS = (valor) => `$${(valor || 0).toLocaleString("es-AR")}`;
 
   const increase = () => setQty((prev) => prev + 1);
   const decrease = () => setQty((prev) => (prev > 1 ? prev - 1 : 1));
 
+  // 🔹 Escucha cambios de stock en tiempo real
+  useEffect(() => {
+    const productRef = doc(db, "categories", categoryId, "products", id);
+    const unsubscribe = onSnapshot(productRef, (snap) => {
+      if (snap.exists()) {
+        setCurrentStock(snap.data().stock ?? 0);
+      }
+    });
+    return () => unsubscribe();
+  }, [categoryId, id]);
+
+  // 🔥 AGREGAR AL CARRITO (valida stock)
   const handleAdd = async () => {
     if (!mesaId) {
       alert("Seleccioná una mesa primero");
       return;
     }
 
+    if (currentStock <= 0) {
+      alert("Sin stock disponible");
+      return;
+    }
+
+    if (qty > currentStock) {
+      alert(`No hay suficiente stock. Disponible: ${currentStock}`);
+      return;
+    }
+
     try {
       await addToCart({
+        id,
+        categoryId,
         name,
         description,
         ingredients,
@@ -47,6 +75,8 @@ const CardProduct = ({
         quantity: qty,
       });
       setQty(1);
+      // opcional: descontar stock localmente para feedback inmediato
+      setCurrentStock(prev => prev - qty);
     } catch (error) {
       console.error("Error agregando producto:", error);
       alert("Error al agregar producto");
@@ -56,7 +86,7 @@ const CardProduct = ({
   const handleDelete = async () => {
     if (!window.confirm("¿Seguro que querés eliminar este producto?")) return;
     try {
-      await deleteDoc(doc(db, "products", id));
+      await deleteDoc(doc(db, "categories", categoryId, "products", id));
       alert("Producto eliminado");
     } catch (error) {
       console.error("Error eliminando producto:", error);
@@ -64,15 +94,45 @@ const CardProduct = ({
     }
   };
 
+  // 🔥 EDITAR CON STOCK
   const handleEdit = async () => {
     try {
-      const productRef = doc(db, "products", id);
-      await updateDoc(productRef, {
-        name: editedName,
-        description: editedDescription,
-        ingredients: editedIngredients,
-        price: Number(editedPrice),
-      });
+      if (!categoryId || !id) {
+        alert("Falta categoryId o id");
+        return;
+      }
+
+      const stockNum = Number(editedStock);
+
+      if (isNaN(stockNum)) {
+        alert("El stock debe ser un número");
+        return;
+      }
+
+      if (stockNum < 0) {
+        alert("El stock no puede ser negativo");
+        return;
+      }
+
+      if (stockNum < 24) {
+        const confirmar = window.confirm(
+          "⚠️ Stock menor a 24 unidades. ¿Seguro querés guardar?"
+        );
+        if (!confirmar) return;
+      }
+
+      const productRef = doc(db, "categories", categoryId, "products", id);
+
+      const data = {
+        name: String(editedName || ""),
+        description: String(editedDescription || ""),
+        ingredients: String(editedIngredients || ""),
+        price: Number(editedPrice) || 0,
+        stock: stockNum,
+      };
+
+      await updateDoc(productRef, data);
+
       alert("Producto actualizado");
       setEditMode(false);
     } catch (error) {
@@ -84,7 +144,6 @@ const CardProduct = ({
   return (
     <>
       <div className={styles.container}>
-        {/* BOTONES ADMIN */}
         {!editMode && (
           <>
             <i
@@ -100,39 +159,46 @@ const CardProduct = ({
           </>
         )}
 
-        {/* IMAGEN */}
-        <img
-          src={image}
-          alt={name}
-          onClick={() => setOpen(true)}
-          className={styles.image}
-        />
+        {image && (
+          <img
+            src={image}
+            alt={name}
+            onClick={() => setOpen(true)}
+            className={styles.image}
+          />
+        )}
 
-        {/* CONTENIDO */}
         <div className={styles.contentBox}>
-          <>
-            <h4 className={styles.name}>{name}</h4>
-            <p>{description}</p>
-            <p className={styles.ingredients}>{ingredients}</p>
+          <h4 className={styles.name}>{name}</h4>
+          <p>{description}</p>
+          <p className={styles.ingredients}>{ingredients}</p>
 
-            {/* CONTADOR */}
-            <div className={styles.counter}>
-              <button onClick={decrease}>-</button>
-              <span>{qty}</span>
-              <button onClick={increase}>+</button>
-            </div>
+          {/* 🔥 STOCK */}
+          <p className={styles.stock}>Stock: {currentStock}</p>
 
-            {/* PRECIO + AGREGAR */}
-            <div className={styles.btn}>
-              <h2>{formatARS(total)}</h2>
-            </div>
-              <button onClick={handleAdd}>Agregar</button>
-          </>
+          {currentStock < 24 && (
+            <p className={styles.lowStock}>
+              ⚠️ Stock bajo (mínimo 24)
+            </p>
+          )}
+
+          {/* CONTADOR */}
+          <div className={styles.counter}>
+            <button onClick={decrease}>-</button>
+            <span>{qty}</span>
+            <button onClick={increase}>+</button>
+          </div>
+
+          <div className={styles.btn}>
+            <h2>{formatARS(total)}</h2>
+          </div>
+
+          <button onClick={handleAdd}>Agregar</button>
         </div>
       </div>
 
       {/* MODAL IMAGEN */}
-      {open && (
+      {open && image && (
         <div className={styles.modal} onClick={() => setOpen(false)}>
           <img
             src={image}
@@ -143,17 +209,13 @@ const CardProduct = ({
         </div>
       )}
 
-      {/* 🔥 MODAL EDITAR */}
+      {/* MODAL EDITAR */}
       {editMode && (
-        <div
-          className={styles.editModal}
-          onClick={() => setEditMode(false)}
-        >
+        <div className={styles.editModal} onClick={() => setEditMode(false)}>
           <div
             className={styles.editContent}
             onClick={(e) => e.stopPropagation()}
           >
-
             <h3>Editar producto</h3>
 
             <input
@@ -182,11 +244,16 @@ const CardProduct = ({
               placeholder="Precio"
             />
 
+            {/* 🔥 INPUT STOCK */}
+            <input
+              type="number"
+              value={editedStock}
+              onChange={(e) => setEditedStock(e.target.value)}
+              placeholder="Stock"
+            />
+
             <div className={styles.editActions}>
-              <button
-                className={styles.saveBtn}
-                onClick={handleEdit}
-              >
+              <button className={styles.saveBtn} onClick={handleEdit}>
                 Guardar
               </button>
 
