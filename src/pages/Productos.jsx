@@ -213,7 +213,7 @@ export const Productos = () => {
     try {
       // 🔹 Armar items desde el carrito
       const items = cart.map((p) => ({
-        id: p.id || null,
+        id: p.productId || null,        // 🔥 ESTE ES EL ID REAL DEL PRODUCTO
         categoryId: p.categoryId || null,
         name: p.name || "",
         price: p.price || 0,
@@ -263,7 +263,7 @@ export const Productos = () => {
     if (!mesaData) return;
 
     try {
-      // 🔥 VALIDACIÓN ANTES (EVITA ERRORES)
+      // 🔥 VALIDACIÓN UX (no crítica)
       for (const item of cart) {
         const product = products.find(p => p.id === item.id);
         const quantity = Number(item.quantity ?? 1);
@@ -274,48 +274,65 @@ export const Productos = () => {
         }
       }
 
-      // 🔹 Crear array de items con detalle seguro
+      // 🔹 ARRAY SEGURO
       const items = cart.map((p) => ({
-        id: p.id ?? null,
-        categoryId: p.categoryId ?? null,
-        name: p.name ?? "",
-        price: Number(p.price ?? 0),
-        quantity: Number(p.quantity ?? 1),
-        total: Number(p.total ?? (p.price ?? 0) * (p.quantity ?? 1)),
-      }));
+  id: p.productId ?? null,        // 🔥 CORREGIDO
+  categoryId: p.categoryId ?? null,
+  name: p.name ?? "",
+  price: Number(p.price ?? 0),
+  quantity: Number(p.quantity ?? 1),
+  total: Number(p.total ?? (p.price ?? 0) * (p.quantity ?? 1)),
+}));
+
+      console.log("🧾 ITEMS A COBRAR:", items);
 
       const now = new Date();
 
-      // 🔥 DESCONTAR STOCK (SEGURO)
-      for (const item of cart) {
-        const productId = item.id ?? null;
-        const categoryId = item.categoryId ?? null;
-        const quantity = Number(item.quantity ?? 1);
+      // 🔥 DESCONTAR STOCK (UNA SOLA TRANSACTION)
+      await runTransaction(db, async (transaction) => {
 
-        if (!productId || !categoryId) continue;
+        const productRefs = [];
+        const snaps = [];
 
-        const productRef = doc(db, "categories", categoryId, "products", productId);
+        // 🔹 1. PREPARAR referencias
+        for (const item of items) {
+          const { id: productId, categoryId } = item;
 
-        await runTransaction(db, async (transaction) => {
-          const snap = await transaction.get(productRef);
+          if (!productId || !categoryId) continue;
+
+          const ref = doc(db, "categories", categoryId, "products", productId);
+          productRefs.push({ ref, item });
+        }
+
+        // 🔹 2. LEER TODO PRIMERO
+        for (const { ref } of productRefs) {
+          const snap = await transaction.get(ref);
+          snaps.push(snap);
+        }
+
+        // 🔹 3. VALIDAR + ACTUALIZAR
+        for (let i = 0; i < productRefs.length; i++) {
+          const { ref, item } = productRefs[i];
+          const snap = snaps[i];
 
           if (!snap.exists()) {
-            console.warn("Producto no encontrado para stock:", item);
-            return;
+            throw new Error(`Producto no encontrado: ${item.name}`);
           }
 
           const currentStock = Number(snap.data().stock ?? 0);
 
-          if (quantity > currentStock) {
+          if (item.quantity > currentStock) {
             throw new Error(`Sin stock suficiente de ${item.name}`);
           }
 
-          const newStock = currentStock - quantity;
+          transaction.update(ref, {
+            stock: currentStock - item.quantity,
+          });
 
-          transaction.update(productRef, { stock: newStock });
-          console.log(`Stock actualizado ${item.name}: ${currentStock} → ${newStock}`);
-        });
-      }
+          console.log(`✅ ${item.name}: ${currentStock} → ${currentStock - item.quantity}`);
+        }
+
+      });
 
       // 🔥 GUARDAR COBRO
       await addDoc(collection(db, "cobros"), {
@@ -326,7 +343,7 @@ export const Productos = () => {
         vuelto: Number(vuelto ?? 0),
         fecha: now.toLocaleDateString("es-AR"),
         hora: now.toLocaleTimeString("es-AR"),
-        items: items ?? [],
+        items,
         userId: auth.currentUser?.uid ?? null,
         userName: userData?.name ?? "Empleado",
         createdAt: new Date(),
@@ -340,24 +357,21 @@ export const Productos = () => {
       setVuelto(0);
 
       alert("✅ Cobrado y stock actualizado");
-    } catch (error) {
-      console.error("Error cobrando:", error);
 
-      if (error.message?.includes("Sin stock")) {
-        alert(error.message);
-      } else {
-        alert("Error al cobrar");
-      }
+    } catch (error) {
+      console.error("❌ Error cobrando:", error.message, error);
+
+      alert(error.message || "Error al cobrar");
     }
   };
 
   // 🔹 Función para imprimir tickets de mesas
-// 🔹 Función para imprimir tickets de mesas (usando cart)
-const imprimirTicket = (mesa, cartItems) => {
-  const ventana = window.open("", "PRINT", "height=600,width=300");
-  const ahora = new Date().toLocaleString();
+  // 🔹 Función para imprimir tickets de mesas (usando cart)
+  const imprimirTicket = (mesa, cartItems) => {
+    const ventana = window.open("", "PRINT", "height=600,width=300");
+    const ahora = new Date().toLocaleString();
 
-  const ticketCocina = `
+    const ticketCocina = `
     <div class="ticket">
       <h2>👨‍🍳 COCINA</h2>
       <h3>Mesa ${mesa.numero}</h3>
@@ -379,7 +393,7 @@ const imprimirTicket = (mesa, cartItems) => {
     </div>
   `;
 
-  const ticketCaja = `
+    const ticketCaja = `
     <div class="ticket">
       <h2>💰 CAJA</h2>
       <h3>Mesa ${mesa.numero}</h3>
@@ -401,7 +415,7 @@ const imprimirTicket = (mesa, cartItems) => {
     </div>
   `;
 
-  const contenido = `
+    const contenido = `
     <html>
       <head>
         <title>Ticket</title>
@@ -421,29 +435,29 @@ const imprimirTicket = (mesa, cartItems) => {
     </html>
   `;
 
-  ventana.document.write(contenido);
-  ventana.document.close();
-  ventana.focus();
+    ventana.document.write(contenido);
+    ventana.document.close();
+    ventana.focus();
 
-  setTimeout(() => {
-    ventana.print();
-    ventana.close();
-  }, 500);
-};
+    setTimeout(() => {
+      ventana.print();
+      ventana.close();
+    }, 500);
+  };
 
-// 🔹 Función para enviar pedido
-// 🔹 Función para enviar pedido
-const enviarPedido = async (mesa) => {
-  if (!mesa) return alert("No hay mesa seleccionada");
+  // 🔹 Función para enviar pedido
+  // 🔹 Función para enviar pedido
+  const enviarPedido = async (mesa) => {
+    if (!mesa) return alert("No hay mesa seleccionada");
 
-  try {
-    imprimirTicket(mesa, cart); // 🔹 PASAR EL CARRITO AQUÍ
-    alert(`Pedido enviado para Mesa ${mesa.numero}`);
-  } catch (error) {
-    console.error("Error enviando pedido:", error);
-    alert("Error enviando pedido");
-  }
-};
+    try {
+      imprimirTicket(mesa, cart); // 🔹 PASAR EL CARRITO AQUÍ
+      alert(`Pedido enviado para Mesa ${mesa.numero}`);
+    } catch (error) {
+      console.error("Error enviando pedido:", error);
+      alert("Error enviando pedido");
+    }
+  };
 
   if (loading) return <p>Cargando productos...</p>;
 
@@ -577,7 +591,7 @@ const enviarPedido = async (mesa) => {
               onChange={(e) => setPago(e.target.value)}
             />
 
-            <h1 style={{ fontSize: "40px", marginTop: "20px" }}>
+            <h1 style={{ fontSize: "40px", marginTop: "20px", background:"transparent" }}>
               Vuelto: {formatARS(vuelto >= 0 ? vuelto : 0)}
             </h1>
 

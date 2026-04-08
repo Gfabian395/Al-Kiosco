@@ -53,49 +53,53 @@ export const CartProvider = ({ children }) => {
 
   // 🔥 AGREGAR PRODUCTO
   const addToCart = async (product) => {
-    if (!mesaId) {
-      alert("Seleccioná una mesa");
-      return;
-    }
+  if (!mesaId) {
+    alert("Seleccioná una mesa");
+    return;
+  }
 
-    try {
-      const pedidoRef = collection(db, "mesas", mesaId, "pedido");
-      const snapshot = await getDocs(pedidoRef);
+  try {
+    const pedidoRef = collection(db, "mesas", mesaId, "pedido");
+    const snapshot = await getDocs(pedidoRef);
 
-      const qty = product.quantity || 1;
+    const qty = product.quantity || 1;
 
-      const exist = snapshot.docs.find(
-        (doc) => doc.data().name === product.name
-      );
+    const exist = snapshot.docs.find(
+      (doc) => doc.data().productId === product.id // 🔥 MEJOR que name
+    );
 
-      if (exist) {
-        const itemRef = doc(db, "mesas", mesaId, "pedido", exist.id);
-        const current = exist.data();
+    if (exist) {
+      const itemRef = doc(db, "mesas", mesaId, "pedido", exist.id);
+      const current = exist.data();
 
-        await updateDoc(itemRef, {
-          quantity: current.quantity + qty,
-          total: current.total + product.price * qty,
-        });
-      } else {
-        await addDoc(pedidoRef, {
-          name: product.name,
-          price: product.price,
-          image: product.image || "",
-          quantity: qty,
-          total: product.price * qty,
-        });
-      }
-
-      // 🔥 marcar mesa ocupada
-      await updateDoc(doc(db, "mesas", mesaId), {
-        ocupada: true,
+      await updateDoc(itemRef, {
+        productId: product.id,
+        categoryId: product.categoryId,
+        quantity: current.quantity + qty,
+        total: current.total + product.price * qty,
       });
 
-    } catch (error) {
-      console.error("Error en addToCart:", error);
-      alert("Error al agregar producto");
+    } else {
+      await addDoc(pedidoRef, {
+        productId: product.id,        // 🔥 CLAVE
+        categoryId: product.categoryId, // 🔥 CLAVE
+        name: product.name,
+        price: product.price,
+        image: product.image || "",
+        quantity: qty,
+        total: product.price * qty,
+      });
     }
-  };
+
+    await updateDoc(doc(db, "mesas", mesaId), {
+      ocupada: true,
+    });
+
+  } catch (error) {
+    console.error("Error en addToCart:", error);
+    alert("Error al agregar producto");
+  }
+};
 
   // 🔥 REMOVER / RESTAR PRODUCTO
   const removeFromCart = async (productId) => {

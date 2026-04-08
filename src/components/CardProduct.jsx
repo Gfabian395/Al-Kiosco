@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useCart } from "../context/CartContext";
-import { doc, deleteDoc, updateDoc, onSnapshot } from "firebase/firestore";
+import { doc, deleteDoc, updateDoc, onSnapshot, runTransaction } from "firebase/firestore";
 import { db } from "../firebase";
 import styles from "./styles/CardProduct.module.css";
 
@@ -47,41 +47,35 @@ const CardProduct = ({
   }, [categoryId, id]);
 
   // 🔥 AGREGAR AL CARRITO (valida stock)
-  const handleAdd = async () => {
-    if (!mesaId) {
-      alert("Seleccioná una mesa primero");
-      return;
-    }
+ const handleAdd = async () => {
+  if (!mesaId) {
+    alert("Seleccioná una mesa primero");
+    return;
+  }
 
-    if (currentStock <= 0) {
-      alert("Sin stock disponible");
-      return;
-    }
+  if (qty > currentStock) {
+    alert(`No hay suficiente stock. Disponible: ${currentStock}`);
+    return;
+  }
 
-    if (qty > currentStock) {
-      alert(`No hay suficiente stock. Disponible: ${currentStock}`);
-      return;
-    }
+  try {
+    await addToCart({
+      id,
+      categoryId,
+      name,
+      description,
+      ingredients,
+      price,
+      image,
+      quantity: qty,
+    });
 
-    try {
-      await addToCart({
-        id,
-        categoryId,
-        name,
-        description,
-        ingredients,
-        price,
-        image,
-        quantity: qty,
-      });
-      setQty(1);
-      // opcional: descontar stock localmente para feedback inmediato
-      setCurrentStock(prev => prev - qty);
-    } catch (error) {
-      console.error("Error agregando producto:", error);
-      alert("Error al agregar producto");
-    }
-  };
+    setQty(1);
+  } catch (error) {
+    console.error(error);
+    alert("Error al agregar");
+  }
+};
 
   const handleDelete = async () => {
     if (!window.confirm("¿Seguro que querés eliminar este producto?")) return;
