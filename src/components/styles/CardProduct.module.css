@@ -53,7 +53,7 @@
 .contentBox {
   position: absolute;
   z-index: 2;
-  bottom: 050px;
+  bottom: 125px;
   width: 100%;
   height: 230px;
   color: #fff;
@@ -346,7 +346,7 @@ h2 {
 @media (max-width: 480px) {
   .container {
     width: 48%;          /* 2 por fila */
-    height: 450px;       /* más compacto */
+    height: 500px;       /* más compacto */
     border-radius: 15px;
   }
 
