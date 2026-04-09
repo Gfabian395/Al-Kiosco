@@ -1,15 +1,6 @@
 import { useEffect, useState } from "react";
 import { auth, db } from "../firebase";
-import {
-  collection,
-  addDoc,
-  query,
-  where,
-  getDocs,
-  updateDoc,
-  doc,
-  getDoc,
-} from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, updateDoc, doc, getDoc, serverTimestamp } from "firebase/firestore";
 import styles from "../components/styles/Perfil.module.css";
 
 export const Perfil = () => {
@@ -84,17 +75,18 @@ export const Perfil = () => {
 
     const { fecha, hora } = getFechaHora();
 
-    const nuevoTurno = {
-      userId: userAuth.uid,
-      nombre: userData.name,
-      email: userData.email,
-      rol: userData.role,
-      inicio: new Date(),
-      fin: null,
-      cajaInicial: totalCaja,
-      cajaFinal: 0,
-      activo: true,
-    };
+    // Dentro de iniciarTurno:
+const nuevoTurno = {
+  userId: userAuth.uid,
+  nombre: userData.name,
+  email: userData.email,
+  rol: userData.role,
+  inicio: serverTimestamp(), // <-- reemplazar new Date()
+  fin: null,
+  cajaInicial: totalCaja,
+  cajaFinal: 0,
+  activo: true,
+};
 
     const docRef = await addDoc(collection(db, "turnos"), nuevoTurno);
 
@@ -225,12 +217,12 @@ export const Perfil = () => {
       </div>
 
       {/* 💰 CAJA */}
-      <div className={`${styles.card} ${styles.caja}`}>
+      {/* <div className={`${styles.card} ${styles.caja}`}>
         <h3>💰 Caja actual</h3>
         <div className={styles.total}>
           {formatARS(totalCaja)}
         </div>
-      </div>
+      </div> */}
 
       {/* 🔄 TURNO */}
       <div className={styles.card}>
@@ -243,11 +235,11 @@ export const Perfil = () => {
         {turno && (
           <div className={styles.turnoData}>
             <p>
-              <strong>Inicio:</strong>{" "}
-              {turno?.inicio?.seconds
-                ? new Date(turno.inicio.seconds * 1000).toLocaleString()
-                : "-"}
-            </p>
+  <strong>Inicio:</strong>{" "}
+  {turno?.inicio?.toDate
+    ? turno.inicio.toDate().toLocaleString("es-AR")
+    : "-"}
+</p>
 
             <p>
               <strong>Caja inicial:</strong>{" "}

@@ -521,12 +521,12 @@ export const Mesas = () => {
               onChange={(e) => setPago(e.target.value)}
             />
 
-            <h1 style={{ fontSize: "40px", marginTop: "20px" }}>
+            <h1 style={{ fontSize: "40px", marginTop: "20px", background: "transparent" }}>
               Vuelto: {formatARS(vuelto >= 0 ? vuelto : 0)}
             </h1>
 
             <div className={styles.actions}>
-              <button onClick={confirmarCobro}>Confirmar cobro</button>
+              <button style={{background:"green"}} onClick={confirmarCobro}>Confirmar cobro</button>
               <button onClick={cerrarPago}>Cancelar</button>
             </div>
           </div>

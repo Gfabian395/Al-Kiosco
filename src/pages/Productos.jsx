@@ -446,18 +446,21 @@ export const Productos = () => {
   };
 
   // 🔹 Función para enviar pedido
-  // 🔹 Función para enviar pedido
-  const enviarPedido = async (mesa) => {
-    if (!mesa) return alert("No hay mesa seleccionada");
+ const enviarPedido = async (mesa) => {
+  if (!mesa) return alert("No hay mesa seleccionada");
 
-    try {
-      imprimirTicket(mesa, cart); // 🔹 PASAR EL CARRITO AQUÍ
+  try {
+    imprimirTicket(mesa, cart); // abrir ticket
+
+    // 🔹 retrasar el alert para que la ventana tenga tiempo de aparecer
+    setTimeout(() => {
       alert(`Pedido enviado para Mesa ${mesa.numero}`);
-    } catch (error) {
-      console.error("Error enviando pedido:", error);
-      alert("Error enviando pedido");
-    }
-  };
+    }, 500); // 0.5 segundos, ajustable
+  } catch (error) {
+    console.error("Error enviando pedido:", error);
+    alert("Error enviando pedido");
+  }
+};
 
   if (loading) return <p>Cargando productos...</p>;
 
