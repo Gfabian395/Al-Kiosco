@@ -5,6 +5,7 @@ import SelectMesa from "../components/SelectMesa";
 import { useCart } from "../context/CartContext";
 import styles from "../components/styles/Mesas.module.css";
 import { onAuthStateChanged } from "firebase/auth"; // 🔥 arriba del archivo
+import logo from "../assets/LaPancheria.png";
 
 export const Mesas = () => {
   const [mesas, setMesas] = useState([]);
@@ -27,61 +28,61 @@ export const Mesas = () => {
 
   // 🔴 LIBERAR
   const liberarMesa = async () => {
-  if (!mesaSeleccionada) return;
+    if (!mesaSeleccionada) return;
 
-  try {
-    const pedidoRef = collection(db, "mesas", mesaSeleccionada.id, "pedido");
-    const snapshot = await getDocs(pedidoRef);
+    try {
+      const pedidoRef = collection(db, "mesas", mesaSeleccionada.id, "pedido");
+      const snapshot = await getDocs(pedidoRef);
 
-    let totalReal = 0;
+      let totalReal = 0;
 
-    // 🔥 Armar items igual que en cobros
-    const items = snapshot.docs.map((docSnap) => {
-      const data = docSnap.data();
+      // 🔥 Armar items igual que en cobros
+      const items = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
 
-      const cantidad = data.quantity || data.cantidad || 1;
-      const precio = data.price || data.precio || 0;
-      const total = data.total || precio * cantidad;
+        const cantidad = data.quantity || data.cantidad || 1;
+        const precio = data.price || data.precio || 0;
+        const total = data.total || precio * cantidad;
 
-      totalReal += total;
+        totalReal += total;
 
-      return {
-        name: data.name || data.nombre,
-        price: precio,
-        quantity: cantidad,
-        total,
-      };
-    });
+        return {
+          name: data.name || data.nombre,
+          price: precio,
+          quantity: cantidad,
+          total,
+        };
+      });
 
-    const now = new Date();
+      const now = new Date();
 
-    // 🟢 GUARDAR EN HISTORIAL (CLAVE)
-    await addDoc(collection(db, "mesasLiberadas"), {
-      mesa: mesaSeleccionada.numero,
-      sector: mesaSeleccionada.sector,
-      items,
-      total: totalReal,
-      fecha: now.toLocaleDateString("es-AR"),
-      hora: now.toLocaleTimeString("es-AR"),
-      estado: "Liberada",
-    });
+      // 🟢 GUARDAR EN HISTORIAL (CLAVE)
+      await addDoc(collection(db, "mesasLiberadas"), {
+        mesa: mesaSeleccionada.numero,
+        sector: mesaSeleccionada.sector,
+        items,
+        total: totalReal,
+        fecha: now.toLocaleDateString("es-AR"),
+        hora: now.toLocaleTimeString("es-AR"),
+        estado: "Liberada",
+      });
 
-    // 🔴 BORRAR PEDIDO
-    const deletes = snapshot.docs.map((d) =>
-      deleteDoc(doc(db, "mesas", mesaSeleccionada.id, "pedido", d.id))
-    );
+      // 🔴 BORRAR PEDIDO
+      const deletes = snapshot.docs.map((d) =>
+        deleteDoc(doc(db, "mesas", mesaSeleccionada.id, "pedido", d.id))
+      );
 
-    await Promise.all(deletes);
+      await Promise.all(deletes);
 
-    // 🔥 limpiar contexto
-    await clearMesa(false);
+      // 🔥 limpiar contexto
+      await clearMesa(false);
 
-    setModalOpen(false);
+      setModalOpen(false);
 
-  } catch (error) {
-    console.error("Error liberando mesa:", error);
-  }
-};
+    } catch (error) {
+      console.error("Error liberando mesa:", error);
+    }
+  };
 
   const abrirPago = () => {
     setModalOpen(false); // 🔥 cerrar modal anterior
@@ -137,7 +138,7 @@ export const Mesas = () => {
     const calculo = pagoNum - total;
     setVuelto(calculo > 0 ? calculo : 0);
   }, [pago, mesaSeleccionada]);
-  
+
   // 🟢 COBRAR
   const confirmarCobro = async () => {
     if (!mesaSeleccionada) return;
@@ -273,105 +274,86 @@ export const Mesas = () => {
   });
 
   const imprimirTicket = (mesa) => {
-    const ventana = window.open("", "PRINT", "height=600,width=300");
+    const ventana = window.open("", "PRINT", "height=500,width=800");
 
     const ahora = new Date().toLocaleString();
 
     const ticketCocina = `
-    <div class="ticket">
-      <h2>👨‍🍳 COCINA</h2>
-      <h3>Mesa ${mesa.numero}</h3>
-      <p>${mesa.sector}</p>
-      <p>${ahora}</p>
-      <hr/>
+    <div style="margin-bottom:30px;">
 
-      ${mesa.pedido
-        .map(
-          (p) => `
-            <div class="item">
-              <span>${p.name}</span>
-              <span>x${p.quantity || 1}</span>
-            </div>
-          `
-        )
-        .join("")}
+    <div style="text-align:center; margin-bottom:10px;">
+          <img src="${logo}" style="width:100%; max-width:400px;" />
+        </div>
+      
+      <h2 style="margin:6px 0; text-align:center; font-size:26px;"> COCINA</h2>
+      <h3 style="margin:6px 0; text-align:center; font-size:22px;">Mesa ${mesa.numero}</h3>
+      <p style="margin:6px 0; text-align:center; font-size:18px;">${mesa.sector}</p>
+      <p style="margin:6px 0; text-align:center; font-size:18px;">${ahora}</p>
 
-      <hr/>
-      <p style="text-align:center;">---------------------------</p>
+      <hr style="border:none; border-top:2px dashed black; margin:10px 0;" />
+
+      ${mesa.pedido.map(p => `
+        <div style="display:flex; justify-content:space-between; font-size:18px;">
+          <span>${p.name}</span>
+          <span>x${p.quantity || 1}</span>
+        </div>
+      `).join("")}
+
+      <hr style="border:none; border-top:2px dashed black; margin:10px 0;" />
+
+      <p style="text-align:center; font-size:16px;">---------------------------</p>
     </div>
   `;
 
     const ticketCaja = `
-    <div class="ticket">
-      <h2>💰 CAJA</h2>
-      <h3>Mesa ${mesa.numero}</h3>
-      <p>${mesa.sector}</p>
-      <p>${ahora}</p>
-      <hr/>
+    <div style="margin-bottom:30px;">
 
-      ${mesa.pedido
-        .map(
-          (p) => `
-            <div class="item">
-              <span>${p.name} x${p.quantity}</span>
-              <span>$${p.total}</span>
-            </div>
-          `
-        )
-        .join("")}
+    <div style="text-align:center; margin-bottom:10px;">
+          <img src="${logo}" style="width:100%; max-width:400px;" />
+        </div>
+      
+      <h2 style="margin:6px 0; text-align:center; font-size:26px;"> CAJA</h2>
+      <h3 style="margin:6px 0; text-align:center; font-size:22px;">Mesa ${mesa.numero}</h3>
+      <p style="margin:6px 0; text-align:center; font-size:18px;">${mesa.sector}</p>
+      <p style="margin:6px 0; text-align:center; font-size:18px;">${ahora}</p>
 
-      <div class="total">
+      <hr style="border:none; border-top:2px dashed black; margin:10px 0;" />
+
+      ${mesa.pedido.map(p => `
+        <div style="display:flex; justify-content:space-between; font-size:18px;">
+          <span>${p.name} x${p.quantity}</span>
+          <span>$${p.total}</span>
+        </div>
+      `).join("")}
+
+      <div style="border-top:2px dashed black; margin-top:12px; padding-top:6px; font-size:22px; text-align:center; font-weight:bold;">
         TOTAL: $${mesa.total}
       </div>
 
-      <p style="text-align:center;">---------------------------</p>
+      <p style="text-align:center; font-size:16px;">---------------------------</p>
     </div>
   `;
 
     const contenido = `
     <html>
       <head>
-        <title>Ticket</title>
         <style>
-          body {
-            font-family: monospace;
-            width: 220px;
-            padding: 5px;
-          }
-
-          .ticket {
-            margin-bottom: 20px;
-          }
-
-          h2, h3, p {
-            margin: 4px 0;
-            text-align: center;
-          }
-
-          .item {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-          }
-
-          .total {
-            border-top: 1px dashed black;
-            margin-top: 10px;
-            padding-top: 5px;
-            font-size: 16px;
-            text-align: center;
-          }
-
-          hr {
-            border: none;
-            border-top: 1px dashed black;
-            margin: 5px 0;
+          @media print {
+            .corte {
+              page-break-before: always;
+            }
           }
         </style>
       </head>
-      <body>
+      <body style="font-family: monospace; width: 250px; padding: 10px;">
+        
         ${ticketCocina}
+
+        <!-- ✂️ CORTE -->
+        <div class="corte"></div>
+
         ${ticketCaja}
+
       </body>
     </html>
   `;
@@ -383,7 +365,7 @@ export const Mesas = () => {
     setTimeout(() => {
       ventana.print();
       ventana.close();
-    }, 500);
+    }, 800);
   };
 
   const enviarPedido = async (mesa) => {
@@ -526,7 +508,7 @@ export const Mesas = () => {
             </h1>
 
             <div className={styles.actions}>
-              <button style={{background:"green"}} onClick={confirmarCobro}>Confirmar cobro</button>
+              <button style={{ background: "green" }} onClick={confirmarCobro}>Confirmar cobro</button>
               <button onClick={cerrarPago}>Cancelar</button>
             </div>
           </div>
