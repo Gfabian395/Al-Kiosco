@@ -8,6 +8,7 @@ import Loader from "../components/Loader";
 import SelectMesa from "../components/SelectMesa";
 import { useCart } from "../context/CartContext";
 import styles from "../components/styles/Productos.module.css";
+import logo from "../assets/LaPancheria.png";
 
 export const Productos = () => {
   const { categoryId } = useParams();
@@ -276,13 +277,13 @@ export const Productos = () => {
 
       // 🔹 ARRAY SEGURO
       const items = cart.map((p) => ({
-  id: p.productId ?? null,        // 🔥 CORREGIDO
-  categoryId: p.categoryId ?? null,
-  name: p.name ?? "",
-  price: Number(p.price ?? 0),
-  quantity: Number(p.quantity ?? 1),
-  total: Number(p.total ?? (p.price ?? 0) * (p.quantity ?? 1)),
-}));
+        id: p.productId ?? null,        // 🔥 CORREGIDO
+        categoryId: p.categoryId ?? null,
+        name: p.name ?? "",
+        price: Number(p.price ?? 0),
+        quantity: Number(p.quantity ?? 1),
+        total: Number(p.total ?? (p.price ?? 0) * (p.quantity ?? 1)),
+      }));
 
       console.log("🧾 ITEMS A COBRAR:", items);
 
@@ -365,102 +366,118 @@ export const Productos = () => {
     }
   };
 
-  // 🔹 Función para imprimir tickets de mesas
-  // 🔹 Función para imprimir tickets de mesas (usando cart)
-  const imprimirTicket = (mesa, cartItems) => {
-    const ventana = window.open("", "PRINT", "height=600,width=300");
-    const ahora = new Date().toLocaleString();
+const imprimirTicket = (mesa, cartItems) => {
+  const ventana = window.open("", "PRINT", "height=500,width=800");
+  const ahora = new Date().toLocaleString();
 
-    const ticketCocina = `
-    <div class="ticket">
-      <h2>👨‍🍳 COCINA</h2>
-      <h3>Mesa ${mesa.numero}</h3>
-      <p>${mesa.sector}</p>
-      <p>${ahora}</p>
-      <hr/>
-      ${cartItems
-        .map(
-          (p) => `
-            <div class="item">
-              <span>${p.name}</span>
-              <span>x${p.quantity || 1}</span>
-            </div>
-          `
-        )
-        .join("")}
-      <hr/>
-      <p style="text-align:center;">---------------------------</p>
+  const total = cartItems.reduce((acc, p) => acc + (p.total || 0), 0);
+
+  const ticketCocina = `
+  <div style="margin-bottom:30px;">
+    
+    <div style="text-align:center; margin-bottom:10px;">
+      <img src="${logo}" style="width:250px;" />
     </div>
-  `;
 
-    const ticketCaja = `
-    <div class="ticket">
-      <h2>💰 CAJA</h2>
-      <h3>Mesa ${mesa.numero}</h3>
-      <p>${mesa.sector}</p>
-      <p>${ahora}</p>
-      <hr/>
-      ${cartItems
-        .map(
-          (p) => `
-            <div class="item">
-              <span>${p.name} x${p.quantity}</span>
-              <span>$${p.total}</span>
-            </div>
-          `
-        )
-        .join("")}
-      <div class="total">TOTAL: $${cartItems.reduce((acc, p) => acc + (p.total || 0), 0)}</div>
-      <p style="text-align:center;">---------------------------</p>
+    <h2 style="margin:6px 0; text-align:center; font-size:26px;">COCINA</h2>
+    <h3 style="margin:6px 0; text-align:center; font-size:22px;">Mesa ${mesa.numero}</h3>
+    <p style="margin:6px 0; text-align:center; font-size:18px;">${mesa.sector}</p>
+    <p style="margin:6px 0; text-align:center; font-size:18px;">${ahora}</p>
+
+    <hr style="border:none; border-top:2px dashed black; margin:10px 0;" />
+
+    ${cartItems.map(p => `
+      <div style="display:flex; justify-content:space-between; font-size:18px;">
+        <span>${p.name}</span>
+        <span>x${p.quantity || 1}</span>
+      </div>
+    `).join("")}
+
+    <hr style="border:none; border-top:2px dashed black; margin:10px 0;" />
+
+    <p style="text-align:center; font-size:16px;">---------------------------</p>
+  </div>
+`;
+
+  const ticketCaja = `
+  <div style="margin-bottom:30px;">
+    
+    <div style="text-align:center; margin-bottom:10px;">
+      <img src="${logo}" style="width:100%; max-width:400px;" />
     </div>
-  `;
 
-    const contenido = `
-    <html>
-      <head>
-        <title>Ticket</title>
-        <style>
-          body { font-family: monospace; width: 220px; padding: 5px; }
-          .ticket { margin-bottom: 20px; }
-          h2, h3, p { margin: 4px 0; text-align: center; }
-          .item { display: flex; justify-content: space-between; font-size: 12px; }
-          .total { border-top: 1px dashed black; margin-top: 10px; padding-top: 5px; font-size: 16px; text-align: center; }
-          hr { border: none; border-top: 1px dashed black; margin: 5px 0; }
-        </style>
-      </head>
-      <body>
-        ${ticketCocina}
-        ${ticketCaja}
-      </body>
-    </html>
-  `;
+    <h2 style="margin:6px 0; text-align:center; font-size:26px;">💰 CAJA</h2>
+    <h3 style="margin:6px 0; text-align:center; font-size:22px;">Mesa ${mesa.numero}</h3>
+    <p style="margin:6px 0; text-align:center; font-size:18px;">${mesa.sector}</p>
+    <p style="margin:6px 0; text-align:center; font-size:18px;">${ahora}</p>
 
-    ventana.document.write(contenido);
-    ventana.document.close();
-    ventana.focus();
+    <hr style="border:none; border-top:2px dashed black; margin:10px 0;" />
 
-    setTimeout(() => {
-      ventana.print();
-      ventana.close();
-    }, 500);
-  };
+    ${cartItems.map(p => `
+      <div style="display:flex; justify-content:space-between; font-size:18px;">
+        <span>${p.name} x${p.quantity}</span>
+        <span>$${p.total}</span>
+      </div>
+    `).join("")}
+
+    <div style="border-top:2px dashed black; margin-top:12px; padding-top:6px; font-size:22px; text-align:center; font-weight:bold;">
+      TOTAL: $${total}
+    </div>
+
+    <p style="text-align:center; font-size:16px;">---------------------------</p>
+  </div>
+`;
+
+  const contenido = `
+  <html>
+    <head>
+      <style>
+        @media print {
+          .corte {
+            page-break-before: always;
+          }
+        }
+      </style>
+    </head>
+    <body style="font-family: monospace; width: 250px; padding: 10px;">
+      
+      ${ticketCocina}
+
+      <!-- 🔥 ESTO GENERA EL CORTE REAL -->
+      <div class="corte"></div>
+
+      ${ticketCaja}
+
+    </body>
+  </html>
+`;
+
+  ventana.document.write(contenido);
+  ventana.document.close();
+  ventana.focus();
+
+  setTimeout(() => {
+    ventana.print();
+    ventana.close();
+  }, 800);
+};
 
   // 🔹 Función para enviar pedido
- const enviarPedido = async (mesa) => {
-  if (!mesa) return alert("No hay mesa seleccionada");
+  const enviarPedido = async (mesa) => {
+    if (!mesa) return alert("No hay mesa seleccionada");
 
-  try {
-    imprimirTicket(mesa, cart); // abrir ticket
+    try {
+      imprimirTicket(mesa, cart); // abrir ticket
 
-    // 🔹 retrasar el alert para que la ventana tenga tiempo de aparecer
-    setTimeout(() => {
-      alert(`Pedido enviado para Mesa ${mesa.numero}`);
-    }, 500); // 0.5 segundos, ajustable
-  } catch (error) {
-    console.error("Error enviando pedido:", error);
-    alert("Error enviando pedido");
-  }
-};
+      // 🔹 retrasar el alert para que la ventana tenga tiempo de aparecer
+      setTimeout(() => {
+        alert(`Pedido enviado para Mesa ${mesa.numero}`);
+      }, 500); // 0.5 segundos, ajustable
+    } catch (error) {
+      console.error("Error enviando pedido:", error);
+      alert("Error enviando pedido");
+    }
+  };
 
   if (loading) return <p>Cargando productos...</p>;
 
@@ -594,7 +611,7 @@ export const Productos = () => {
               onChange={(e) => setPago(e.target.value)}
             />
 
-            <h1 style={{ fontSize: "40px", marginTop: "20px", background:"transparent" }}>
+            <h1 style={{ fontSize: "40px", marginTop: "20px", background: "transparent" }}>
               Vuelto: {formatARS(vuelto >= 0 ? vuelto : 0)}
             </h1>
 
