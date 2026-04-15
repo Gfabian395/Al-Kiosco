@@ -43,30 +43,6 @@ export const Productos = () => {
 
   const [saving, setSaving] = useState(false);
 
-  // 🔥 traer productos
-  const fetchProducts = async () => {
-    try {
-      const productsRef = collection(
-        db,
-        "categories",
-        categoryId,
-        "products"
-      );
-
-      const snapshot = await getDocs(productsRef);
-      const prods = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
-      setProducts(prods);
-    } catch (err) {
-      console.error("Error cargando productos:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (mesaId) {
       setCartVisible(true); // 🔥 abre al seleccionar mesa
@@ -150,10 +126,21 @@ export const Productos = () => {
 
   // 🔥 guardar producto
   const handleSaveProduct = async () => {
+    if (role !== "jefe" && role !== "encargado") {
+      alert("No tenés permisos");
+      return;
+    }
     if (saving) return;
 
-    if (!name || !price) {
-      alert("Nombre y precio son obligatorios");
+    const priceNum = Number(price);
+
+    if (!name.trim()) {
+      alert("El nombre es obligatorio");
+      return;
+    }
+
+    if (isNaN(priceNum) || priceNum <= 0) {
+      alert("El precio debe ser mayor a 0");
       return;
     }
 
@@ -176,7 +163,7 @@ export const Productos = () => {
         name,
         description,
         ingredients,
-        price: parseFloat(price),
+        price: priceNum,
         image: imageUrl,
         stock: 0, // 👈 IMPORTANTE
       };
@@ -264,56 +251,68 @@ export const Productos = () => {
     if (!mesaData) return;
 
     try {
-      // 🔥 VALIDACIÓN UX (no crítica)
+      // 🔥 VALIDACIÓN DE PAGO (PRODUCCIÓN)
+      const pagoNum = parseFloat(pago);
+
+      if (isNaN(pagoNum) || pagoNum <= 0) {
+        alert("Ingresá un pago válido");
+        return;
+      }
+
+      if (pagoNum < total) {
+        alert("El pago es menor al total");
+        return;
+      }
+
+      // 🔥 VALIDACIÓN SEGURA DE ITEMS
       for (const item of cart) {
-        const product = products.find(p => p.id === item.id);
+        if (!item.productId) {
+          throw new Error(`Item corrupto: ${item.name}`);
+        }
+
+        const product = products.find(p => p.id === item.productId);
         const quantity = Number(item.quantity ?? 1);
 
-        if (product && quantity > (product.stock ?? 0)) {
-          alert(`No hay suficiente stock de ${item.name}`);
-          return;
+        if (!product) {
+          throw new Error(`Producto no encontrado: ${item.name}`);
+        }
+
+        if (quantity <= 0) {
+          throw new Error(`Cantidad inválida en ${item.name}`);
+        }
+
+        if (quantity > Number(product.stock ?? 0)) {
+          throw new Error(`Sin stock suficiente de ${item.name}`);
         }
       }
 
-      // 🔹 ARRAY SEGURO
+      // 🔹 ARRAY LIMPIO Y CONSISTENTE
       const items = cart.map((p) => ({
-        id: p.productId ?? null,        // 🔥 CORREGIDO
-        categoryId: p.categoryId ?? null,
+        id: p.productId,
+        categoryId: p.categoryId,
         name: p.name ?? "",
         price: Number(p.price ?? 0),
         quantity: Number(p.quantity ?? 1),
         total: Number(p.total ?? (p.price ?? 0) * (p.quantity ?? 1)),
       }));
 
-      console.log("🧾 ITEMS A COBRAR:", items);
-
       const now = new Date();
 
-      // 🔥 DESCONTAR STOCK (UNA SOLA TRANSACTION)
+      // 🔥 TRANSACTION (ATÓMICA)
       await runTransaction(db, async (transaction) => {
+        const refs = [];
 
-        const productRefs = [];
-        const snaps = [];
-
-        // 🔹 1. PREPARAR referencias
         for (const item of items) {
-          const { id: productId, categoryId } = item;
-
-          if (!productId || !categoryId) continue;
-
-          const ref = doc(db, "categories", categoryId, "products", productId);
-          productRefs.push({ ref, item });
+          const ref = doc(db, "categories", item.categoryId, "products", item.id);
+          refs.push({ ref, item });
         }
 
-        // 🔹 2. LEER TODO PRIMERO
-        for (const { ref } of productRefs) {
-          const snap = await transaction.get(ref);
-          snaps.push(snap);
-        }
+        const snaps = await Promise.all(
+          refs.map(({ ref }) => transaction.get(ref))
+        );
 
-        // 🔹 3. VALIDAR + ACTUALIZAR
-        for (let i = 0; i < productRefs.length; i++) {
-          const { ref, item } = productRefs[i];
+        for (let i = 0; i < refs.length; i++) {
+          const { ref, item } = refs[i];
           const snap = snaps[i];
 
           if (!snap.exists()) {
@@ -329,10 +328,7 @@ export const Productos = () => {
           transaction.update(ref, {
             stock: currentStock - item.quantity,
           });
-
-          console.log(`✅ ${item.name}: ${currentStock} → ${currentStock - item.quantity}`);
         }
-
       });
 
       // 🔥 GUARDAR COBRO
@@ -340,8 +336,8 @@ export const Productos = () => {
         mesa: mesaData.numero ?? "Sin mesa",
         sector: mesaData.sector ?? "Sin sector",
         total: Number(total ?? 0),
-        pago: parseFloat(pago ?? 0),
-        vuelto: Number(vuelto ?? 0),
+        pago: pagoNum,
+        vuelto: Number(pagoNum - total),
         fecha: now.toLocaleDateString("es-AR"),
         hora: now.toLocaleTimeString("es-AR"),
         items,
@@ -350,6 +346,7 @@ export const Productos = () => {
         createdAt: new Date(),
       });
 
+      // 🔥 LIMPIEZA FINAL
       await clearMesa(true);
 
       setModalPagoOpen(false);
@@ -360,19 +357,18 @@ export const Productos = () => {
       alert("✅ Cobrado y stock actualizado");
 
     } catch (error) {
-      console.error("❌ Error cobrando:", error.message, error);
-
+      console.error("❌ Error cobrando:", error);
       alert(error.message || "Error al cobrar");
     }
   };
 
-const imprimirTicket = (mesa, cartItems) => {
-  const ventana = window.open("", "PRINT", "height=500,width=800");
-  const ahora = new Date().toLocaleString();
+  const imprimirTicket = (mesa, cartItems) => {
+    const ventana = window.open("", "PRINT", "height=500,width=800");
+    const ahora = new Date().toLocaleString();
 
-  const total = cartItems.reduce((acc, p) => acc + (p.total || 0), 0);
+    const total = cartItems.reduce((acc, p) => acc + (p.total || 0), 0);
 
-  const ticketCocina = `
+    const ticketCocina = `
   <div style="margin-bottom:30px;">
     
     <div style="text-align:center; margin-bottom:10px;">
@@ -399,7 +395,7 @@ const imprimirTicket = (mesa, cartItems) => {
   </div>
 `;
 
-  const ticketCaja = `
+    const ticketCaja = `
   <div style="margin-bottom:30px;">
     
     <div style="text-align:center; margin-bottom:10px;">
@@ -428,7 +424,7 @@ const imprimirTicket = (mesa, cartItems) => {
   </div>
 `;
 
-  const contenido = `
+    const contenido = `
   <html>
     <head>
       <style>
@@ -452,15 +448,15 @@ const imprimirTicket = (mesa, cartItems) => {
   </html>
 `;
 
-  ventana.document.write(contenido);
-  ventana.document.close();
-  ventana.focus();
+    ventana.document.write(contenido);
+    ventana.document.close();
+    ventana.focus();
 
-  setTimeout(() => {
-    ventana.print();
-    ventana.close();
-  }, 800);
-};
+    setTimeout(() => {
+      ventana.print();
+      ventana.close();
+    }, 800);
+  };
 
   // 🔹 Función para enviar pedido
   const enviarPedido = async (mesa) => {
@@ -516,12 +512,25 @@ const imprimirTicket = (mesa, cartItems) => {
                     <span>{p.quantity}</span>
                     <button
                       onClick={() => {
-                        const product = products.find(prod => prod.id === p.id);
-                        if (product && p.quantity >= (product.stock || 0)) {
+                        const product = products.find(prod => prod.id === (p.productId || p.id));
+
+                        if (!product) {
+                          alert("Producto no encontrado");
+                          return;
+                        }
+
+                        if (p.quantity >= (product.stock || 0)) {
                           alert("No hay más stock disponible");
                           return;
                         }
-                        addToCart(p);
+
+                        addToCart({
+                          productId: product.id,
+                          categoryId: categoryId,
+                          name: product.name,
+                          price: product.price,
+                          quantity: 1
+                        });
                       }}
                     >
                       +
@@ -564,14 +573,15 @@ const imprimirTicket = (mesa, cartItems) => {
             {products.map((prod) => (
               <CardProduct
                 key={prod.id}
-                id={prod.id} // 🔥 FALTABA
-                categoryId={categoryId} // 🔥 FALTABA
+                id={prod.id}
+                categoryId={categoryId}
                 name={prod.name}
                 description={prod.description}
                 ingredients={prod.ingredients}
                 price={prod.price}
                 image={prod.image}
-                stock={prod.stock} // 👈 CLAVE
+                stock={prod.stock}
+                role={role} // 🔥 AGREGAR ESTO
               />
             ))}
           </div>
@@ -628,9 +638,11 @@ const imprimirTicket = (mesa, cartItems) => {
         </div>
       )}
 
-      <div className={styles.fab} onClick={openProductModal}>
-        +
-      </div>
+      {(role === "jefe" || role === "encargado") && (
+        <div className={styles.fab} onClick={openProductModal}>
+          +
+        </div>
+      )}
 
       {modalProductOpen && (
         <div className={styles.modalOverlay} onClick={closeProductModal}>

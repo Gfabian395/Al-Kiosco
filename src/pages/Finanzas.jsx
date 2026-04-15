@@ -7,7 +7,10 @@ export const Finanzas = () => {
   const [cobros, setCobros] = useState([]);
   const [mesasLiberadas, setMesasLiberadas] = useState([]);
   const [movimientos, setMovimientos] = useState([]);
-
+  const safeNumber = (n) => {
+  const num = Number(n);
+  return Number.isFinite(num) ? num : 0;
+};
   const formatARS = (valor) =>
     `$${(valor || 0).toLocaleString("es-AR")}`;
 
@@ -88,16 +91,25 @@ export const Finanzas = () => {
     .filter((m) => m.tipo === "egreso")
     .reduce((acc, m) => acc + (m.monto || 0), 0);
 
-  const cajaReal = ingresos - egresos;
+  const apertura = movimientos
+    .filter((m) => m.tipo === "apertura")
+    .reduce((acc, m) => acc + (m.monto || 0), 0);
 
-  const totalGeneral = cobros.reduce(
-    (acc, c) => acc + (c.total || 0),
-    0
-  );
+  const cajaReal = apertura + ingresos - egresos;
+
+  const totalGeneral = cobros.reduce((acc, c) => {
+  const totalCobro = (c.items || []).reduce((sum, item) => {
+    const cantidad = item.quantity || item.cantidad || 1;
+    const precio = item.unitPrice || item.price || item.precio || 0;
+    return sum + cantidad * precio;
+  }, 0);
+
+  return acc + totalCobro;
+}, 0);
 
   return (
     <div className={styles.container}>
-      
+
       {/* 💰 RESUMEN CAJA REAL */}
       {/* <div className={styles.section}>
         <h2 className={styles.title}>📊 Caja (Control Total)</h2>
@@ -119,7 +131,7 @@ export const Finanzas = () => {
           <div className={styles.list}>
             {movimientos.map((m) => (
               <div key={m.id} className={styles.card}>
-                
+
                 <div className={styles.row}>
                   <span>
                     {m.tipo === "apertura" && "🟢 APERTURA"}
@@ -156,58 +168,66 @@ export const Finanzas = () => {
           <p className={styles.empty}>No hay cobros</p>
         ) : (
           <div className={styles.list}>
-            {cobros.map((c) => (
-              <div key={c.id} className={styles.card}>
-                
-                <div className={styles.row}>
-                  <span>Mesa {c.mesa}</span>
-                  <span className={styles.total}>
-                    {formatARS(c.total)}
-                  </span>
-                </div>
+            {cobros.map((c) => {
 
-                <div className={styles.info}>
-                  <span>{c.sector || "-"}</span>
-                  <span>{c.fecha || "-"}</span>
-                  <span>{c.hora || "-"}</span>
-                </div>
+              // 🔥 TOTAL REAL DEL COBRO (NO usar c.total)
+              const totalCobro = (c.items || []).reduce((sum, item) => {
+                const cantidad = item.quantity || item.cantidad || 1;
+                const precio = item.unitPrice || item.price || item.precio || 0;
+                return sum + cantidad * precio;
+              }, 0);
 
-                <hr />
+              return (
+                <div key={c.id} className={styles.card}>
 
-                {c.items && c.items.length > 0 ? (
-                  <div className={styles.items}>
-                    {c.items.map((item, i) => {
-                      const cantidad =
-                        item.quantity || item.cantidad || 1;
+                  <div className={styles.row}>
+                    <span>Mesa {c.mesa}</span>
 
-                      const precio =
-                        item.price || item.precio || 0;
-
-                      const totalItem =
-                        item.total || precio * cantidad;
-
-                      return (
-                        <div key={i} className={styles.itemRow}>
-                          <span>
-                            {item.name || item.nombre} x{cantidad}
-                          </span>
-                          <span>{formatARS(totalItem)}</span>
-                        </div>
-                      );
-                    })}
+                    <span className={styles.total}>
+                      {formatARS(totalCobro)}
+                    </span>
                   </div>
-                ) : (
-                  <p className={styles.empty}>Sin detalle</p>
-                )}
 
-                <hr />
+                  <div className={styles.info}>
+                    <span>{c.sector || "-"}</span>
+                    <span>{c.fecha || "-"}</span>
+                    <span>{c.hora || "-"}</span>
+                  </div>
 
-                <div className={styles.extra}>
-                  <span>Pagó: {formatARS(c.pago)}</span>
-                  <span>Vuelto: {formatARS(c.vuelto)}</span>
+                  <hr />
+
+                  {c.items && c.items.length > 0 ? (
+                    <div className={styles.items}>
+                      {c.items.map((item, i) => {
+                        const cantidad = item.quantity || item.cantidad || 1;
+                        const precio = item.unitPrice || item.price || item.precio || 0;
+
+                        const totalItem = cantidad * precio;
+
+                        return (
+                          <div key={i} className={styles.itemRow}>
+                            <span>
+                              {item.name || item.nombre} x{cantidad}
+                            </span>
+                            <span>{formatARS(totalItem)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className={styles.empty}>Sin detalle</p>
+                  )}
+
+                  <hr />
+
+                  <div className={styles.extra}>
+                    <span>Pagó: {formatARS(safeNumber(c.pago))}</span>
+                    <span>Vuelto: {formatARS(safeNumber(c.vuelto))}</span>
+                  </div>
+
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -222,7 +242,7 @@ export const Finanzas = () => {
           <div className={styles.list}>
             {mesasLiberadas.map((m) => (
               <div key={m.id} className={styles.card}>
-                
+
                 <div className={styles.row}>
                   <span>Mesa {m.mesa}</span>
                   <span>{m.estado || "Liberada"}</span>
@@ -239,14 +259,13 @@ export const Finanzas = () => {
                 {m.items && m.items.length > 0 ? (
                   <div className={styles.items}>
                     {m.items.map((item, i) => {
-                      const cantidad =
-                        item.quantity || item.cantidad || 1;
+                      const cantidad = item.quantity || item.cantidad || 1;
 
-                      const precio =
-                        item.price || item.precio || 0;
+                      // 🔥 SIEMPRE usar precio unitario real
+                      const precio = item.unitPrice || item.price || item.precio || 0;
 
-                      const totalItem =
-                        item.total || precio * cantidad;
+                      // ❌ ignorar item.total porque puede estar mal
+                      const totalItem = precio * cantidad;
 
                       return (
                         <div key={i} className={styles.itemRow}>

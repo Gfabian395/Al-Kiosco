@@ -8,7 +8,8 @@ export const Perfil = () => {
   const [userData, setUserData] = useState(null);
   const [turno, setTurno] = useState(null);
   const [totalCaja, setTotalCaja] = useState(0);
-
+  const [cajaInicialManual, setCajaInicialManual] = useState(0);
+  const cajaInicial = Number(cajaInicialManual) || 0;
   const formatARS = (v) =>
     `$${(v || 0).toLocaleString("es-AR")}`;
 
@@ -76,24 +77,24 @@ export const Perfil = () => {
     const { fecha, hora } = getFechaHora();
 
     // Dentro de iniciarTurno:
-const nuevoTurno = {
-  userId: userAuth.uid,
-  nombre: userData.name,
-  email: userData.email,
-  rol: userData.role,
-  inicio: serverTimestamp(), // <-- reemplazar new Date()
-  fin: null,
-  cajaInicial: totalCaja,
-  cajaFinal: 0,
-  activo: true,
-};
+    const nuevoTurno = {
+      userId: userAuth.uid,
+      nombre: userData.name,
+      email: userData.email,
+      rol: userData.role,
+      inicio: serverTimestamp(),
+      fin: null,
+      cajaInicial,
+      cajaFinal: 0,
+      activo: true,
+    };
 
     const docRef = await addDoc(collection(db, "turnos"), nuevoTurno);
 
     // 🔥 MOVIMIENTO DE CAJA (APERTURA)
     await addDoc(collection(db, "movimientosCaja"), {
       tipo: "apertura",
-      monto: totalCaja,
+      monto: cajaInicial,
       descripcion: "Inicio de turno",
       userId: userAuth.uid,
       userName: userData.name,
@@ -107,8 +108,7 @@ const nuevoTurno = {
       id: docRef.id,
       ...nuevoTurno,
     });
-
-    imprimirTicket("INICIO", totalCaja, 0);
+    imprimirTicket("INICIO", cajaInicial, 0);
   };
 
   // 🔴 FINALIZAR TURNO
@@ -117,32 +117,46 @@ const nuevoTurno = {
 
     const { fecha, hora } = getFechaHora();
 
-    const ref = doc(db, "turnos", turno.id);
+    const refTurno = doc(db, "turnos", turno.id);
 
-    await updateDoc(ref, {
-      fin: new Date(),
+    const ganancia = totalCaja - Number(turno.cajaInicial || 0);
+
+    await updateDoc(refTurno, {
+      fin: serverTimestamp(),
       cajaFinal: totalCaja,
       activo: false,
     });
 
-    const diferencia = totalCaja - turno.cajaInicial;
-
-    // 🔥 MOVIMIENTO DE CAJA (CIERRE)
     await addDoc(collection(db, "movimientosCaja"), {
       tipo: "cierre",
       monto: totalCaja,
+      ganancia,
       descripcion: "Cierre de turno",
       userId: userAuth.uid,
       userName: userData.name,
       turnoId: turno.id,
       fecha,
       hora,
-      createdAt: new Date(),
+      createdAt: serverTimestamp(),
     });
 
-    imprimirTicket("CIERRE", totalCaja, diferencia);
+    // 🧾 RESUMEN DIARIO
+    await addDoc(collection(db, "cajaDiaria"), {
+      fecha,
+      inicioCaja: turno.cajaInicial,
+      cierreCaja: totalCaja,
+      ventas: ganancia,
+      userId: userAuth.uid,
+      userName: userData.name,
+      turnoId: turno.id,
+      createdAt: serverTimestamp(),
+    });
+
+    imprimirTicket("CIERRE", totalCaja, ganancia);
 
     setTurno(null);
+    setTotalCaja(0);
+setCajaInicialManual(0);
   };
 
   // 🧾 PRINT MEJORADO
@@ -160,15 +174,14 @@ const nuevoTurno = {
 
         <hr/>
 
-        ${
-          tipo === "CIERRE"
-            ? `
+        ${tipo === "CIERRE"
+        ? `
           <p>Inicial: ${formatARS(turno?.cajaInicial)}</p>
           <p>Final: ${formatARS(monto)}</p>
           <p>Ganancia: ${formatARS(ganancia)}</p>
         `
-            : `<h2>${formatARS(monto)}</h2>`
-        }
+        : `<h2>${formatARS(monto)}</h2>`
+      }
 
         <hr/>
         <p>Gracias</p>
@@ -181,10 +194,7 @@ const nuevoTurno = {
     win.print();
   };
 
-  const diferencia =
-    turno && turno.cajaInicial
-      ? totalCaja - turno.cajaInicial
-      : 0;
+  const diferencia = totalCaja - Number(turno?.cajaInicial || 0);
 
   return (
     <div className={styles.container}>
@@ -235,11 +245,11 @@ const nuevoTurno = {
         {turno && (
           <div className={styles.turnoData}>
             <p>
-  <strong>Inicio:</strong>{" "}
-  {turno?.inicio?.toDate
-    ? turno.inicio.toDate().toLocaleString("es-AR")
-    : "-"}
-</p>
+              <strong>Inicio:</strong>{" "}
+              {turno?.inicio?.toDate
+                ? turno.inicio.toDate().toLocaleString("es-AR")
+                : "-"}
+            </p>
 
             <p>
               <strong>Caja inicial:</strong>{" "}
@@ -272,6 +282,18 @@ const nuevoTurno = {
           🔴 Finalizar turno
         </button>
       </div>
+
+      <div className={styles.card}>
+        <h3>💰 Inicio de caja</h3>
+
+        <input
+          type="number"
+          value={cajaInicialManual}
+          onChange={(e) => setCajaInicialManual(Number(e.target.value))}
+          placeholder="Monto inicial en $"
+        />
+      </div>
+
     </div>
   );
 };

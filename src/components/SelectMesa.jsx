@@ -129,7 +129,7 @@ const SelectMesa = () => {
             </button>
 
             {/* 🔥 ELIMINAR SOLO JEFE */}
-            {role?.toLowerCase().trim() === "jefe" && (
+            {["jefe", "encargado"].includes(role?.toLowerCase().trim()) && (
               <button
                 className={styles.deleteBtn}
                 onClick={() => handleDeleteMesa(m.id)}
@@ -151,7 +151,7 @@ const SelectMesa = () => {
         {renderMesas(mesasAfuera, "afuera")}
 
         {/* 🔥 SOLO JEFE CREA MESAS */}
-        {role?.toLowerCase().trim() === "jefe" && (
+        {["jefe", "encargado"].includes(role?.toLowerCase().trim()) && (
           <button
             className={styles.addBtn}
             onClick={() => setModalOpen(true)}

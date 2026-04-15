@@ -6,13 +6,15 @@ import { useAuth } from "../context/AuthContext";
 import styles from "./styles/CardCategory.module.css";
 
 const CardCategory = ({ id, name, image, onClick = () => { }, onCategoryUpdated = () => { } }) => {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [editing, setEditing] = useState(false);
   const [newName, setNewName] = useState(name);
   const [newImageFile, setNewImageFile] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const canEdit = role === "jefe" || role === "encargado";
   const handleSave = async () => {
+    if (!canEdit) return;
     if (!newName.trim()) return;
     try {
       setLoading(true);
@@ -44,6 +46,7 @@ const CardCategory = ({ id, name, image, onClick = () => { }, onCategoryUpdated 
   };
 
   const handleDelete = async () => {
+    if (!canEdit) return;
     if (!confirm(`¿Seguro que querés eliminar "${name}"?`)) return;
     try {
       await deleteDoc(doc(db, "categories", id));
@@ -56,33 +59,39 @@ const CardCategory = ({ id, name, image, onClick = () => { }, onCategoryUpdated 
   return (
     <>
       <div className={styles.container} onClick={onClick}>
-  {!editing ? (
-    <>
-      {image && <img src={image} alt={name} />}
-      <div className={styles.overlay}>
-        <h3 className={styles.title}>{name}</h3>
-      </div>
+        {!editing ? (
+          <>
+            {image && <img src={image} alt={name} />}
+            <div className={styles.overlay}>
+              <h3 className={styles.title}>{name}</h3>
+            </div>
 
-      <div className={styles.topButtons}>
-        <button
-          className={styles.editBtn}
-          onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-        >
-          ✎
-        </button>
-        <button
-          className={styles.deleteBtn}
-          onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-        >
-          🗑
-        </button>
+            {canEdit && (
+              <div className={styles.topButtons}>
+                <button
+                  className={styles.editBtn}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!canEdit) return;
+                    setEditing(true);
+                  }}
+                >
+                  ✎
+                </button>
+                <button
+                  className={styles.deleteBtn}
+                  onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+                >
+                  🗑
+                </button>
+              </div>
+            )}
+          </>
+        ) : null}
       </div>
-    </>
-  ) : null}
-</div>
 
       {/* 🔥 MODAL EDITAR */}
-      {editing && (
+      {editing && canEdit && (
         <div
           className={styles.editModal}
           onClick={() => setEditing(false)}
