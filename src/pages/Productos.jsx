@@ -246,119 +246,94 @@ export const Productos = () => {
 
   // 🔥 confirmar cobro final
   const handleCobrar = async () => {
-    if (!mesaData) return;
+  if (!mesaData) return;
 
-    try {
-      // 🔥 VALIDACIÓN DE PAGO (PRODUCCIÓN)
-      const pagoNum = parseFloat(pago);
+  try {
+    const pagoNum = parseFloat(pago);
 
-      if (isNaN(pagoNum) || pagoNum <= 0) {
-        alert("Ingresá un pago válido");
-        return;
-      }
-
-      if (pagoNum < total) {
-        alert("El pago es menor al total");
-        return;
-      }
-
-      // 🔥 VALIDACIÓN SEGURA DE ITEMS
-      for (const item of cart) {
-        if (!item.productId) {
-          throw new Error(`Item corrupto: ${item.name}`);
-        }
-
-        const product = products.find(p => p.id === item.productId);
-        const quantity = Number(item.quantity ?? 1);
-
-        if (!product) {
-          throw new Error(`Producto no encontrado: ${item.name}`);
-        }
-
-        if (quantity <= 0) {
-          throw new Error(`Cantidad inválida en ${item.name}`);
-        }
-
-        if (quantity > Number(product.stock ?? 0)) {
-          throw new Error(`Sin stock suficiente de ${item.name}`);
-        }
-      }
-
-      // 🔹 ARRAY LIMPIO Y CONSISTENTE
-      const items = cart.map((p) => ({
-        id: p.productId,
-        categoryId: p.categoryId,
-        name: p.name ?? "",
-        price: Number(p.price ?? 0),
-        quantity: Number(p.quantity ?? 1),
-        total: Number(p.total ?? (p.price ?? 0) * (p.quantity ?? 1)),
-      }));
-
-      const now = new Date();
-
-      // 🔥 TRANSACTION (ATÓMICA)
-      await runTransaction(db, async (transaction) => {
-        const refs = [];
-
-        for (const item of items) {
-          const ref = doc(db, "categories", item.categoryId, "products", item.id);
-          refs.push({ ref, item });
-        }
-
-        const snaps = await Promise.all(
-          refs.map(({ ref }) => transaction.get(ref))
-        );
-
-        for (let i = 0; i < refs.length; i++) {
-          const { ref, item } = refs[i];
-          const snap = snaps[i];
-
-          if (!snap.exists()) {
-            throw new Error(`Producto no encontrado: ${item.name}`);
-          }
-
-          const currentStock = Number(snap.data().stock ?? 0);
-
-          if (item.quantity > currentStock) {
-            throw new Error(`Sin stock suficiente de ${item.name}`);
-          }
-
-          transaction.update(ref, {
-            stock: currentStock - item.quantity,
-          });
-        }
-      });
-
-      // 🔥 GUARDAR COBRO
-      await addDoc(collection(db, "cobros"), {
-        mesa: mesaData.numero ?? "Sin mesa",
-        sector: mesaData.sector ?? "Sin sector",
-        total: Number(total ?? 0),
-        pago: pagoNum,
-        vuelto: Number(pagoNum - total),
-        fecha: now.toLocaleDateString("es-AR"),
-        hora: now.toLocaleTimeString("es-AR"),
-        items,
-        userId: auth.currentUser?.uid ?? null,
-        userName: userData?.name ?? "Empleado",
-        createdAt: new Date(),
-      });
-
-      // 🔥 LIMPIEZA FINAL
-      await clearMesa(true);
-
-      setModalPagoOpen(false);
-      closeCobroModal();
-      setPago("");
-      setVuelto(0);
-
-      alert("✅ Cobrado y stock actualizado");
-
-    } catch (error) {
-      console.error("❌ Error cobrando:", error);
-      alert(error.message || "Error al cobrar");
+    if (isNaN(pagoNum) || pagoNum <= 0) {
+      alert("Ingresá un pago válido");
+      return;
     }
-  };
+
+    if (pagoNum < total) {
+      alert("El pago es menor al total");
+      return;
+    }
+
+    const items = cart.map((p) => ({
+      id: p.productId,
+      categoryId: p.categoryId,
+      name: p.name ?? "",
+      price: Number(p.price ?? 0),
+      quantity: Number(p.quantity ?? 1),
+      total: Number(p.total ?? (p.price ?? 0) * (p.quantity ?? 1)),
+    }));
+
+    const now = new Date();
+
+    // 🔥 TRANSACTION
+    await runTransaction(db, async (transaction) => {
+  for (const item of items) {
+    const productRef = doc(
+      db,
+      "categories",
+      item.categoryId,
+      "products",
+      item.id
+    );
+
+    const snap = await transaction.get(productRef);
+
+    if (!snap.exists()) {
+      throw new Error(`Producto no encontrado: ${item.name}`);
+    }
+
+    const currentStock = Number(snap.data().stock ?? 0);
+
+    if (item.quantity <= 0) {
+      throw new Error(`Cantidad inválida en ${item.name}`);
+    }
+
+    if (item.quantity > currentStock) {
+      throw new Error(`Sin stock suficiente de ${item.name}`);
+    }
+
+    transaction.update(productRef, {
+      stock: currentStock - item.quantity,
+    });
+  }
+});
+
+    // 🔥 GUARDAR COBRO
+    await addDoc(collection(db, "cobros"), {
+      mesa: mesaData.numero ?? "Sin mesa",
+      sector: mesaData.sector ?? "Sin sector",
+      total: Number(total ?? 0),
+      pago: pagoNum,
+      vuelto: pagoNum - total,
+      fecha: now.toLocaleDateString("es-AR"),
+      hora: now.toLocaleTimeString("es-AR"),
+      items,
+      userId: auth.currentUser?.uid ?? null,
+      userName: userData?.name ?? "Empleado",
+      createdAt: new Date(),
+    });
+
+    await clearMesa(true);
+
+    setModalPagoOpen(false);
+    closeCobroModal();
+    setPago("");
+    setVuelto(0);
+
+    alert("✅ Cobrado y stock actualizado");
+
+  } catch (error) {
+    console.error("❌ Error cobrando:", error);
+    alert(error.message || "Error al cobrar");
+  }
+};
 
   const imprimirTicket = (mesa, cartItems) => {
     const ventana = window.open("", "PRINT", "height=500,width=800");

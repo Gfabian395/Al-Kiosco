@@ -65,8 +65,8 @@ export const CartProvider = ({ children }) => {
     const qty = product.quantity || 1;
 
     const exist = snapshot.docs.find(
-      (doc) => doc.data().productId === product.id // 🔥 MEJOR que name
-    );
+  (doc) => doc.data().productId === product.productId || doc.data().productId === product.id
+);
 
     if (exist) {
       const itemRef = doc(db, "mesas", mesaId, "pedido", exist.id);
