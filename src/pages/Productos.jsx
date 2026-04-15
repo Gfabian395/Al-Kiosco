@@ -126,68 +126,68 @@ export const Productos = () => {
   };
 
   // 🔥 guardar producto
- const handleSaveProduct = async () => {
-  if (role !== "jefe" && role !== "encargado") {
-    alert("No tenés permisos");
-    return;
-  }
-  if (saving) return;
+  const handleSaveProduct = async () => {
+    if (role !== "jefe" && role !== "encargado") {
+      alert("No tenés permisos");
+      return;
+    }
+    if (saving) return;
 
-  const priceNum = Number(price);
-  const stockNum = Number(stock); // 👈 VA ACÁ ARRIBA
+    const priceNum = Number(price);
+    const stockNum = Number(stock); // 👈 VA ACÁ ARRIBA
 
-  if (!name.trim()) {
-    alert("El nombre es obligatorio");
-    return;
-  }
-
-  if (isNaN(priceNum) || priceNum <= 0) {
-    alert("El precio debe ser mayor a 0");
-    return;
-  }
-
-  if (isNaN(stockNum) || stockNum < 0) {
-    alert("El stock debe ser 0 o mayor");
-    return;
-  }
-
-  try {
-    setSaving(true);
-
-    let imageUrl = "";
-
-    if (imageFile) {
-      const storageRef = ref(
-        storage,
-        `products/${Date.now()}-${imageFile.name}`
-      );
-
-      await uploadBytes(storageRef, imageFile);
-      imageUrl = await getDownloadURL(storageRef);
+    if (!name.trim()) {
+      alert("El nombre es obligatorio");
+      return;
     }
 
-    const newProduct = {
-      name,
-      description,
-      ingredients,
-      price: priceNum,
-      image: imageUrl,
-      stock: stockNum, // ✔ correcto
-    };
+    if (isNaN(priceNum) || priceNum <= 0) {
+      alert("El precio debe ser mayor a 0");
+      return;
+    }
 
-    await addDoc(
-      collection(db, "categories", categoryId, "products"),
-      newProduct
-    );
+    if (isNaN(stockNum) || stockNum < 0) {
+      alert("El stock debe ser 0 o mayor");
+      return;
+    }
 
-    closeProductModal();
-  } catch (err) {
-    console.error("Error guardando producto:", err);
-    alert("Error al guardar producto");
-  } finally {
-    setSaving(false);
-  }
-};
+    try {
+      setSaving(true);
+
+      let imageUrl = "";
+
+      if (imageFile) {
+        const storageRef = ref(
+          storage,
+          `products/${Date.now()}-${imageFile.name}`
+        );
+
+        await uploadBytes(storageRef, imageFile);
+        imageUrl = await getDownloadURL(storageRef);
+      }
+
+      const newProduct = {
+        name,
+        description,
+        ingredients,
+        price: priceNum,
+        image: imageUrl,
+        stock: stockNum, // ✔ correcto
+      };
+
+      await addDoc(
+        collection(db, "categories", categoryId, "products"),
+        newProduct
+      );
+
+      closeProductModal();
+    } catch (err) {
+      console.error("Error guardando producto:", err);
+      alert("Error al guardar producto");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // 🔥 modal cobrar/liberar
   const openCobroModal = () => setModalCobroOpen(true);
@@ -246,94 +246,107 @@ export const Productos = () => {
 
   // 🔥 confirmar cobro final
   const handleCobrar = async () => {
-  if (!mesaData) return;
+    if (!mesaData) return;
 
-  try {
-    const pagoNum = parseFloat(pago);
+    try {
+      const pagoNum = parseFloat(pago);
 
-    if (isNaN(pagoNum) || pagoNum <= 0) {
-      alert("Ingresá un pago válido");
-      return;
+      if (isNaN(pagoNum) || pagoNum <= 0) {
+        alert("Ingresá un pago válido");
+        return;
+      }
+
+      if (pagoNum < total) {
+        alert("El pago es menor al total");
+        return;
+      }
+
+      const items = cart.map((p) => ({
+        id: p.productId,
+        categoryId: p.categoryId,
+        name: p.name ?? "",
+        price: Number(p.price ?? 0),
+        quantity: Number(p.quantity ?? 1),
+        total: Number(p.total ?? (p.price ?? 0) * (p.quantity ?? 1)),
+      }));
+
+      const now = new Date();
+
+      // 🔥 TRANSACTION
+      await runTransaction(db, async (transaction) => {
+        const refs = [];
+        const snaps = [];
+
+        // 🔵 FASE 1: SOLO LECTURAS
+        for (const item of items) {
+          const productRef = doc(
+            db,
+            "categories",
+            item.categoryId,
+            "products",
+            item.id
+          );
+
+          const snap = await transaction.get(productRef);
+
+          if (!snap.exists()) {
+            throw new Error(`Producto no encontrado: ${item.name}`);
+          }
+
+          refs.push({ ref: productRef, item });
+          snaps.push(snap);
+        }
+
+        // 🔴 FASE 2: SOLO ESCRITURAS
+        for (let i = 0; i < refs.length; i++) {
+          const { ref, item } = refs[i];
+          const snap = snaps[i];
+
+          const currentStock = Number(snap.data().stock ?? 0);
+
+          if (item.quantity <= 0) {
+            throw new Error(`Cantidad inválida en ${item.name}`);
+          }
+
+          if (item.quantity > currentStock) {
+            throw new Error(`Sin stock suficiente de ${item.name}`);
+          }
+
+          transaction.update(ref, {
+            stock: currentStock - item.quantity,
+          });
+        }
+      });
+
+      // 🔥 GUARDAR COBRO
+      await addDoc(collection(db, "cobros"), {
+        mesa: mesaData.numero ?? "Sin mesa",
+        sector: mesaData.sector ?? "Sin sector",
+        total: Number(total ?? 0),
+        pago: pagoNum,
+        vuelto: pagoNum - total,
+        fecha: now.toLocaleDateString("es-AR"),
+        hora: now.toLocaleTimeString("es-AR"),
+        items,
+        userId: auth.currentUser?.uid ?? null,
+        userName: userData?.name ?? "Empleado",
+        createdAt: new Date(),
+      });
+
+      await clearMesa(true);
+
+      setModalPagoOpen(false);
+      closeCobroModal();
+      setPago("");
+      setVuelto(0);
+
+      alert("✅ Cobrado y stock actualizado");
+
+    } catch (error) {
+      console.error("❌ Error cobrando:", error);
+      alert(error.message || "Error al cobrar");
     }
-
-    if (pagoNum < total) {
-      alert("El pago es menor al total");
-      return;
-    }
-
-    const items = cart.map((p) => ({
-      id: p.productId,
-      categoryId: p.categoryId,
-      name: p.name ?? "",
-      price: Number(p.price ?? 0),
-      quantity: Number(p.quantity ?? 1),
-      total: Number(p.total ?? (p.price ?? 0) * (p.quantity ?? 1)),
-    }));
-
-    const now = new Date();
-
-    // 🔥 TRANSACTION
-    await runTransaction(db, async (transaction) => {
-  for (const item of items) {
-    const productRef = doc(
-      db,
-      "categories",
-      item.categoryId,
-      "products",
-      item.id
-    );
-
-    const snap = await transaction.get(productRef);
-
-    if (!snap.exists()) {
-      throw new Error(`Producto no encontrado: ${item.name}`);
-    }
-
-    const currentStock = Number(snap.data().stock ?? 0);
-
-    if (item.quantity <= 0) {
-      throw new Error(`Cantidad inválida en ${item.name}`);
-    }
-
-    if (item.quantity > currentStock) {
-      throw new Error(`Sin stock suficiente de ${item.name}`);
-    }
-
-    transaction.update(productRef, {
-      stock: currentStock - item.quantity,
-    });
-  }
-});
-
-    // 🔥 GUARDAR COBRO
-    await addDoc(collection(db, "cobros"), {
-      mesa: mesaData.numero ?? "Sin mesa",
-      sector: mesaData.sector ?? "Sin sector",
-      total: Number(total ?? 0),
-      pago: pagoNum,
-      vuelto: pagoNum - total,
-      fecha: now.toLocaleDateString("es-AR"),
-      hora: now.toLocaleTimeString("es-AR"),
-      items,
-      userId: auth.currentUser?.uid ?? null,
-      userName: userData?.name ?? "Empleado",
-      createdAt: new Date(),
-    });
-
-    await clearMesa(true);
-
-    setModalPagoOpen(false);
-    closeCobroModal();
-    setPago("");
-    setVuelto(0);
-
-    alert("✅ Cobrado y stock actualizado");
-
-  } catch (error) {
-    console.error("❌ Error cobrando:", error);
-    alert(error.message || "Error al cobrar");
-  }
-};
+  };
 
   const imprimirTicket = (mesa, cartItems) => {
     const ventana = window.open("", "PRINT", "height=500,width=800");
