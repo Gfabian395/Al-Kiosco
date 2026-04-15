@@ -24,7 +24,7 @@ export const Productos = () => {
     addToCart,
     removeFromCart,
   } = useCart();
-
+  const [stock, setStock] = useState("");
   const [mesaData, setMesaData] = useState(null);
   const [modalCobroOpen, setModalCobroOpen] = useState(false);
   const [modalProductOpen, setModalProductOpen] = useState(false);
@@ -121,75 +121,73 @@ export const Productos = () => {
     setDescription("");
     setIngredients("");
     setPrice("");
+    setStock("");
     setImageFile(null);
   };
 
   // 🔥 guardar producto
-  const handleSaveProduct = async () => {
-    if (role !== "jefe" && role !== "encargado") {
-      alert("No tenés permisos");
-      return;
-    }
-    if (saving) return;
+ const handleSaveProduct = async () => {
+  if (role !== "jefe" && role !== "encargado") {
+    alert("No tenés permisos");
+    return;
+  }
+  if (saving) return;
 
-    const priceNum = Number(price);
+  const priceNum = Number(price);
+  const stockNum = Number(stock); // 👈 VA ACÁ ARRIBA
 
-    if (!name.trim()) {
-      alert("El nombre es obligatorio");
-      return;
-    }
+  if (!name.trim()) {
+    alert("El nombre es obligatorio");
+    return;
+  }
 
-    if (isNaN(priceNum) || priceNum <= 0) {
-      alert("El precio debe ser mayor a 0");
-      return;
-    }
+  if (isNaN(priceNum) || priceNum <= 0) {
+    alert("El precio debe ser mayor a 0");
+    return;
+  }
 
-    try {
-      setSaving(true);
+  if (isNaN(stockNum) || stockNum < 0) {
+    alert("El stock debe ser 0 o mayor");
+    return;
+  }
 
-      let imageUrl = "";
+  try {
+    setSaving(true);
 
-      if (imageFile) {
-        const storageRef = ref(
-          storage,
-          `products/${Date.now()}-${imageFile.name}`
-        );
+    let imageUrl = "";
 
-        await uploadBytes(storageRef, imageFile);
-        imageUrl = await getDownloadURL(storageRef);
-      }
-
-      const newProduct = {
-        name,
-        description,
-        ingredients,
-        price: priceNum,
-        image: imageUrl,
-        stock: 0, // 👈 IMPORTANTE
-      };
-
-      const productsRef = collection(
-        db,
-        "categories",
-        categoryId,
-        "products"
+    if (imageFile) {
+      const storageRef = ref(
+        storage,
+        `products/${Date.now()}-${imageFile.name}`
       );
 
-      const docRef = await addDoc(productsRef, newProduct);
-
-      setProducts((prev) => [
-        ...prev,
-        { id: docRef.id, ...newProduct },
-      ]);
-
-      closeProductModal();
-    } catch (err) {
-      console.error("Error guardando producto:", err);
-      alert("Error al guardar producto");
-    } finally {
-      setSaving(false);
+      await uploadBytes(storageRef, imageFile);
+      imageUrl = await getDownloadURL(storageRef);
     }
-  };
+
+    const newProduct = {
+      name,
+      description,
+      ingredients,
+      price: priceNum,
+      image: imageUrl,
+      stock: stockNum, // ✔ correcto
+    };
+
+    await addDoc(
+      collection(db, "categories", categoryId, "products"),
+      newProduct
+    );
+
+    closeProductModal();
+  } catch (err) {
+    console.error("Error guardando producto:", err);
+    alert("Error al guardar producto");
+  } finally {
+    setSaving(false);
+  }
+};
 
   // 🔥 modal cobrar/liberar
   const openCobroModal = () => setModalCobroOpen(true);
@@ -369,84 +367,84 @@ export const Productos = () => {
     const total = cartItems.reduce((acc, p) => acc + (p.total || 0), 0);
 
     const ticketCocina = `
-  <div style="margin-bottom:30px;">
-    
-    <div style="text-align:center; margin-bottom:10px;">
-      <img src="${logo}" style="width:250px;" />
-    </div>
-
-    <h2 style="margin:6px 0; text-align:center; font-size:26px;">COCINA</h2>
-    <h3 style="margin:6px 0; text-align:center; font-size:22px;">Mesa ${mesa.numero}</h3>
-    <p style="margin:6px 0; text-align:center; font-size:18px;">${mesa.sector}</p>
-    <p style="margin:6px 0; text-align:center; font-size:18px;">${ahora}</p>
-
-    <hr style="border:none; border-top:2px dashed black; margin:10px 0;" />
-
-    ${cartItems.map(p => `
-      <div style="display:flex; justify-content:space-between; font-size:18px;">
-        <span>${p.name}</span>
-        <span>x${p.quantity || 1}</span>
+    <div style="margin-bottom:30px;">
+      
+      <div style="text-align:center; margin-bottom:10px;">
+        <img src="${logo}" style="width:250px;" />
       </div>
-    `).join("")}
 
-    <hr style="border:none; border-top:2px dashed black; margin:10px 0;" />
+      <h2 style="margin:6px 0; text-align:center; font-size:26px;">COCINA</h2>
+      <h3 style="margin:6px 0; text-align:center; font-size:22px;">Mesa ${mesa.numero}</h3>
+      <p style="margin:6px 0; text-align:center; font-size:18px;">${mesa.sector}</p>
+      <p style="margin:6px 0; text-align:center; font-size:18px;">${ahora}</p>
 
-    <p style="text-align:center; font-size:16px;">---------------------------</p>
-  </div>
-`;
+      <hr style="border:none; border-top:2px dashed black; margin:10px 0;" />
+
+      ${cartItems.map(p => `
+        <div style="display:flex; justify-content:space-between; font-size:18px;">
+          <span>${p.name}</span>
+          <span>x${p.quantity || 1}</span>
+        </div>
+      `).join("")}
+
+      <hr style="border:none; border-top:2px dashed black; margin:10px 0;" />
+
+      <p style="text-align:center; font-size:16px;">---------------------------</p>
+    </div>
+  `;
 
     const ticketCaja = `
-  <div style="margin-bottom:30px;">
-    
-    <div style="text-align:center; margin-bottom:10px;">
-      <img src="${logo}" style="width:100%; max-width:400px;" />
-    </div>
-
-    <h2 style="margin:6px 0; text-align:center; font-size:26px;">💰 CAJA</h2>
-    <h3 style="margin:6px 0; text-align:center; font-size:22px;">Mesa ${mesa.numero}</h3>
-    <p style="margin:6px 0; text-align:center; font-size:18px;">${mesa.sector}</p>
-    <p style="margin:6px 0; text-align:center; font-size:18px;">${ahora}</p>
-
-    <hr style="border:none; border-top:2px dashed black; margin:10px 0;" />
-
-    ${cartItems.map(p => `
-      <div style="display:flex; justify-content:space-between; font-size:18px;">
-        <span>${p.name} x${p.quantity}</span>
-        <span>$${p.total}</span>
+    <div style="margin-bottom:30px;">
+      
+      <div style="text-align:center; margin-bottom:10px;">
+        <img src="${logo}" style="width:100%; max-width:400px;" />
       </div>
-    `).join("")}
 
-    <div style="border-top:2px dashed black; margin-top:12px; padding-top:6px; font-size:22px; text-align:center; font-weight:bold;">
-      TOTAL: $${total}
+      <h2 style="margin:6px 0; text-align:center; font-size:26px;">💰 CAJA</h2>
+      <h3 style="margin:6px 0; text-align:center; font-size:22px;">Mesa ${mesa.numero}</h3>
+      <p style="margin:6px 0; text-align:center; font-size:18px;">${mesa.sector}</p>
+      <p style="margin:6px 0; text-align:center; font-size:18px;">${ahora}</p>
+
+      <hr style="border:none; border-top:2px dashed black; margin:10px 0;" />
+
+      ${cartItems.map(p => `
+        <div style="display:flex; justify-content:space-between; font-size:18px;">
+          <span>${p.name} x${p.quantity}</span>
+          <span>$${p.total}</span>
+        </div>
+      `).join("")}
+
+      <div style="border-top:2px dashed black; margin-top:12px; padding-top:6px; font-size:22px; text-align:center; font-weight:bold;">
+        TOTAL: $${total}
+      </div>
+
+      <p style="text-align:center; font-size:16px;">---------------------------</p>
     </div>
-
-    <p style="text-align:center; font-size:16px;">---------------------------</p>
-  </div>
-`;
+  `;
 
     const contenido = `
-  <html>
-    <head>
-      <style>
-        @media print {
-          .corte {
-            page-break-before: always;
+    <html>
+      <head>
+        <style>
+          @media print {
+            .corte {
+              page-break-before: always;
+            }
           }
-        }
-      </style>
-    </head>
-    <body style="font-family: monospace; width: 250px; padding: 10px;">
-      
-      ${ticketCocina}
+        </style>
+      </head>
+      <body style="font-family: monospace; width: 250px; padding: 10px;">
+        
+        ${ticketCocina}
 
-      <!-- 🔥 ESTO GENERA EL CORTE REAL -->
-      <div class="corte"></div>
+        <!-- 🔥 ESTO GENERA EL CORTE REAL -->
+        <div class="corte"></div>
 
-      ${ticketCaja}
+        ${ticketCaja}
 
-    </body>
-  </html>
-`;
+      </body>
+    </html>
+  `;
 
     ventana.document.write(contenido);
     ventana.document.close();
@@ -653,6 +651,7 @@ export const Productos = () => {
             <input type="text" placeholder="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} />
             <input type="text" placeholder="Ingredientes" value={ingredients} onChange={(e) => setIngredients(e.target.value)} />
             <input type="number" placeholder="Precio" value={price} onChange={(e) => setPrice(e.target.value)} />
+            <input type="number" placeholder="Stock" value={stock} onChange={(e) => setStock(e.target.value)} />
             <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} />
 
             <div className={styles.actions}>

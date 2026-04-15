@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
 import { auth, db } from "../firebase";
-import { collection, addDoc, query, where, getDocs, updateDoc, doc, getDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  query,
+  where,
+  getDocs,
+  updateDoc,
+  doc,
+  getDoc,
+  serverTimestamp
+} from "firebase/firestore";
 import styles from "../components/styles/Perfil.module.css";
 
 export const Perfil = () => {
@@ -8,8 +18,14 @@ export const Perfil = () => {
   const [userData, setUserData] = useState(null);
   const [turno, setTurno] = useState(null);
   const [totalCaja, setTotalCaja] = useState(0);
-  const [cajaInicialManual, setCajaInicialManual] = useState(0);
+  const [cajaInicialManual, setCajaInicialManual] = useState('');
+
   const cajaInicial = Number(cajaInicialManual) || 0;
+
+  const esAdmin =
+    userData?.role === "jefe" ||
+    userData?.role === "encargado";
+
   const formatARS = (v) =>
     `$${(v || 0).toLocaleString("es-AR")}`;
 
@@ -54,29 +70,84 @@ export const Perfil = () => {
     }
   };
 
-  // 💰 CAJA (sigue siendo global por ahora)
+  // 💰 CAJA
   useEffect(() => {
-    const fetchCaja = async () => {
-      const snapshot = await getDocs(collection(db, "cobros"));
+    if (!turno?.id) return;
 
-      const total = snapshot.docs.reduce(
-        (acc, d) => acc + (d.data().total || 0),
-        0
+    const fetchCaja = async () => {
+      const q = query(
+        collection(db, "cobros"),
+        where("turnoId", "==", turno.id)
       );
+
+      const snapshot = await getDocs(q);
+
+      const total = snapshot.docs.reduce((acc, d) => {
+        const data = d.data();
+
+        const totalCobro = (data.items || []).reduce((sum, item) => {
+          const cantidad = item.quantity || item.cantidad || 1;
+          const precio = item.unitPrice || item.price || item.precio || 0;
+          return sum + cantidad * precio;
+        }, 0);
+
+        return acc + totalCobro;
+      }, 0);
 
       setTotalCaja(total);
     };
 
     fetchCaja();
-  }, []);
+  }, [turno?.id]);
 
-  // 🟢 INICIAR TURNO
-  const iniciarTurno = async () => {
-    if (!userAuth || !userData || turno) return;
+  // 💸 RETIRO COMPLETO (MEJORADO)
+  const registrarRetiro = async (monto, destinatario) => {
+    if (!esAdmin) return;
+
+    if (!monto || monto <= 0) {
+      alert("Monto inválido");
+      return;
+    }
+
+    if (!destinatario || destinatario.trim() === "") {
+      alert("Debes indicar quién retira el dinero");
+      return;
+    }
 
     const { fecha, hora } = getFechaHora();
 
-    // Dentro de iniciarTurno:
+    await addDoc(collection(db, "movimientosCaja"), {
+      tipo: "retiro",
+      monto,
+      descripcion: "Retiro de efectivo",
+      retiradoPor: destinatario, // 👈 NUEVO
+      entregadoPor: userData.name, // 👈 NUEVO (quien entrega)
+      userId: userAuth.uid,
+      userName: userData.name,
+      fecha,
+      hora,
+      createdAt: serverTimestamp(),
+    });
+
+    alert(`💸 Retiro registrado: $${monto}`);
+  };
+
+  // 🟢 INICIAR TURNO
+  const iniciarTurno = async () => {
+    if (!userAuth || !userData) return;
+
+    if (turno) {
+      alert("⚠️ Ya hay un turno activo");
+      return;
+    }
+
+    if (esAdmin && cajaInicial <= 0) {
+      alert("⚠️ Debes ingresar una caja inicial mayor a 0");
+      return;
+    }
+
+    const { fecha, hora } = getFechaHora();
+
     const nuevoTurno = {
       userId: userAuth.uid,
       nombre: userData.name,
@@ -84,42 +155,43 @@ export const Perfil = () => {
       rol: userData.role,
       inicio: serverTimestamp(),
       fin: null,
-      cajaInicial,
+      cajaInicial: esAdmin ? cajaInicial : 0,
       cajaFinal: 0,
       activo: true,
     };
 
     const docRef = await addDoc(collection(db, "turnos"), nuevoTurno);
 
-    // 🔥 MOVIMIENTO DE CAJA (APERTURA)
     await addDoc(collection(db, "movimientosCaja"), {
       tipo: "apertura",
-      monto: cajaInicial,
+      monto: esAdmin ? cajaInicial : 0,
       descripcion: "Inicio de turno",
       userId: userAuth.uid,
       userName: userData.name,
       turnoId: docRef.id,
       fecha,
       hora,
-      createdAt: new Date(),
+      createdAt: serverTimestamp(),
     });
 
-    setTurno({
-      id: docRef.id,
-      ...nuevoTurno,
-    });
-    imprimirTicket("INICIO", cajaInicial, 0);
+    setTurno({ id: docRef.id, ...nuevoTurno });
+
+    alert(`🟢 Turno iniciado`);
   };
 
   // 🔴 FINALIZAR TURNO
   const finalizarTurno = async () => {
-    if (!turno) return;
+    if (!turno) {
+      alert("⚠️ No hay turno activo");
+      return;
+    }
 
     const { fecha, hora } = getFechaHora();
 
     const refTurno = doc(db, "turnos", turno.id);
 
-    const ganancia = totalCaja - Number(turno.cajaInicial || 0);
+    const ganancia =
+      totalCaja - Number(turno.cajaInicial || 0);
 
     await updateDoc(refTurno, {
       fin: serverTimestamp(),
@@ -140,7 +212,6 @@ export const Perfil = () => {
       createdAt: serverTimestamp(),
     });
 
-    // 🧾 RESUMEN DIARIO
     await addDoc(collection(db, "cajaDiaria"), {
       fecha,
       inicioCaja: turno.cajaInicial,
@@ -152,119 +223,53 @@ export const Perfil = () => {
       createdAt: serverTimestamp(),
     });
 
-    imprimirTicket("CIERRE", totalCaja, ganancia);
-
     setTurno(null);
     setTotalCaja(0);
-setCajaInicialManual(0);
+    setCajaInicialManual(0);
+
+    alert(`🔴 Turno cerrado`);
   };
 
-  // 🧾 PRINT MEJORADO
-  const imprimirTicket = (tipo, monto, ganancia) => {
-    const contenido = `
-      <div style="font-family: monospace; width: 220px; text-align:center;">
-        <h3>AL-KIOSCO</h3>
-        <p>${tipo} DE TURNO</p>
-        <p>${new Date().toLocaleString()}</p>
-
-        <hr/>
-
-        <p><strong>${userData?.name}</strong></p>
-        <p>${userData?.role}</p>
-
-        <hr/>
-
-        ${tipo === "CIERRE"
-        ? `
-          <p>Inicial: ${formatARS(turno?.cajaInicial)}</p>
-          <p>Final: ${formatARS(monto)}</p>
-          <p>Ganancia: ${formatARS(ganancia)}</p>
-        `
-        : `<h2>${formatARS(monto)}</h2>`
-      }
-
-        <hr/>
-        <p>Gracias</p>
-      </div>
-    `;
-
-    const win = window.open("", "", "width=300,height=600");
-    win.document.write(contenido);
-    win.document.close();
-    win.print();
-  };
-
-  const diferencia = totalCaja - Number(turno?.cajaInicial || 0);
+  const diferencia =
+    totalCaja - Number(turno?.cajaInicial || 0);
 
   return (
     <div className={styles.container}>
       <h2 className={styles.title}>👤 Perfil</h2>
 
-      {/* 👤 INFO */}
+      {/* INFO */}
       <div className={styles.card}>
         <h3>Información</h3>
-
-        <div className={styles.infoRow}>
-          <span className={styles.label}>Nombre</span>
-          <span className={styles.value}>
-            {userData?.name || "-"}
-          </span>
-        </div>
-
-        <div className={styles.infoRow}>
-          <span className={styles.label}>Email</span>
-          <span className={styles.value}>
-            {userData?.email || "-"}
-          </span>
-        </div>
-
-        <div className={styles.infoRow}>
-          <span className={styles.label}>Rol</span>
-          <span className={styles.value}>
-            {userData?.role || "-"}
-          </span>
-        </div>
+        <p>{userData?.name}</p>
+        <p>{userData?.email}</p>
+        <p>{userData?.role}</p>
       </div>
 
-      {/* 💰 CAJA */}
-      {/* <div className={`${styles.card} ${styles.caja}`}>
-        <h3>💰 Caja actual</h3>
-        <div className={styles.total}>
-          {formatARS(totalCaja)}
-        </div>
-      </div> */}
-
-      {/* 🔄 TURNO */}
+      {/* TURNO */}
       <div className={styles.card}>
         <h3>Turno</h3>
 
-        <p className={turno ? styles.turnoActivo : styles.turnoInactivo}>
-          {turno ? "🟢 Activo" : "Sin turno activo"}
-        </p>
+        <p>{turno ? "🟢 Activo" : "Sin turno activo"}</p>
 
         {turno && (
-          <div className={styles.turnoData}>
+          <>
             <p>
-              <strong>Inicio:</strong>{" "}
-              {turno?.inicio?.toDate
-                ? turno.inicio.toDate().toLocaleString("es-AR")
-                : "-"}
+              Inicio:{" "}
+              {turno?.inicio?.toDate?.().toLocaleString("es-AR")}
             </p>
 
             <p>
-              <strong>Caja inicial:</strong>{" "}
-              {formatARS(turno.cajaInicial)}
+              Caja inicial: {formatARS(turno.cajaInicial)}
             </p>
 
             <p>
-              <strong>Generado:</strong>{" "}
-              {formatARS(diferencia)}
+              Generado: {formatARS(diferencia)}
             </p>
-          </div>
+          </>
         )}
       </div>
 
-      {/* 🔘 BOTONES */}
+      {/* BOTONES */}
       <div className={styles.actions}>
         <button
           className={`${styles.btn} ${styles.start}`}
@@ -283,17 +288,38 @@ setCajaInicialManual(0);
         </button>
       </div>
 
-      <div className={styles.card}>
-        <h3>💰 Inicio de caja</h3>
+      {/* 💰 CAJA INICIAL */}
+      {!turno && esAdmin && (
+        <div className={styles.card}>
+          <h3>💰 Inicio de caja</h3>
 
-        <input
-          type="number"
-          value={cajaInicialManual}
-          onChange={(e) => setCajaInicialManual(Number(e.target.value))}
-          placeholder="Monto inicial en $"
-        />
-      </div>
+          <input
+            type="number"
+            value={cajaInicialManual}
+            onChange={(e) =>
+              setCajaInicialManual(Number(e.target.value))
+            }
+            placeholder="Monto inicial en $"
+          />
+        </div>
+      )}
 
+      {/* 💸 RETIRO MEJORADO */}
+      {esAdmin && (
+        <div className={styles.card}>
+          <h3>💸 Retiro de efectivo</h3>
+
+          <button
+            onClick={() => {
+              const monto = Number(prompt("Monto a retirar:"));
+              const persona = prompt("¿Quién retira el dinero?");
+              registrarRetiro(monto, persona);
+            }}
+          >
+            Registrar retiro
+          </button>
+        </div>
+      )}
     </div>
   );
 };

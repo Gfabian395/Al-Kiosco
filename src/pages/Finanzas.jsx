@@ -8,9 +8,9 @@ export const Finanzas = () => {
   const [mesasLiberadas, setMesasLiberadas] = useState([]);
   const [movimientos, setMovimientos] = useState([]);
   const safeNumber = (n) => {
-  const num = Number(n);
-  return Number.isFinite(num) ? num : 0;
-};
+    const num = Number(n);
+    return Number.isFinite(num) ? num : 0;
+  };
   const formatARS = (valor) =>
     `$${(valor || 0).toLocaleString("es-AR")}`;
 
@@ -83,29 +83,39 @@ export const Finanzas = () => {
   }, []);
 
   // 🔥 TOTALES REALES
+  // 🔥 INGRESOS (ventas manuales o extra)
   const ingresos = movimientos
     .filter((m) => m.tipo === "ingreso")
     .reduce((acc, m) => acc + (m.monto || 0), 0);
 
+  // 🔥 EGRESOS (gastos)
   const egresos = movimientos
     .filter((m) => m.tipo === "egreso")
     .reduce((acc, m) => acc + (m.monto || 0), 0);
 
-  const apertura = movimientos
+  // 🔥 RETIROS (dinero sacado de caja)
+  const retiros = movimientos
+    .filter((m) => m.tipo === "retiro")
+    .reduce((acc, m) => acc + (m.monto || 0), 0);
+
+  // 🔥 APERTURA (dinero inicial de caja)
+  const aperturaTotal = movimientos
     .filter((m) => m.tipo === "apertura")
     .reduce((acc, m) => acc + (m.monto || 0), 0);
 
-  const cajaReal = apertura + ingresos - egresos;
-
   const totalGeneral = cobros.reduce((acc, c) => {
-  const totalCobro = (c.items || []).reduce((sum, item) => {
-    const cantidad = item.quantity || item.cantidad || 1;
-    const precio = item.unitPrice || item.price || item.precio || 0;
-    return sum + cantidad * precio;
+    const totalCobro = (c.items || []).reduce((sum, item) => {
+      const cantidad = item.quantity || item.cantidad || 1;
+      const precio = item.unitPrice || item.price || item.precio || 0;
+      return sum + cantidad * precio;
+    }, 0);
+
+    return acc + totalCobro;
   }, 0);
 
-  return acc + totalCobro;
-}, 0);
+  // 🔥 CAJA REAL
+  const cajaReal =
+  aperturaTotal + totalGeneral - egresos - retiros;
 
   return (
     <div className={styles.container}>
@@ -120,6 +130,17 @@ export const Finanzas = () => {
           <h3>Caja real: {formatARS(cajaReal)}</h3>
         </div>
       </div> */}
+      <div className={styles.section}>
+        <h2 className={styles.title}>📊 Resumen de Caja Real</h2>
+
+        <div className={styles.totalBox}>
+          <p>Ventas: {formatARS(totalGeneral)}</p>
+          <p>Apertura: {formatARS(aperturaTotal)}</p>
+          <p>Retiros: {formatARS(-retiros)}</p>
+          <h3>Caja real: {formatARS(cajaReal)}</h3>
+        </div>
+      </div>
+
 
       {/* 🧾 MOVIMIENTOS */}
       <div className={styles.section}>
