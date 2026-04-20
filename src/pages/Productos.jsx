@@ -10,6 +10,7 @@ import { useCart } from "../context/CartContext";
 import styles from "../components/styles/Productos.module.css";
 import logo from "../assets/LaPancheria.png";
 import { query, where } from "firebase/firestore";
+import Buscador from "../components/Buscador";
 
 export const Productos = () => {
   const { categoryId } = useParams();
@@ -41,8 +42,9 @@ export const Productos = () => {
   const [ingredients, setIngredients] = useState("");
   const [price, setPrice] = useState("");
   const [imageFile, setImageFile] = useState(null);
-const [cobrando, setCobrando] = useState(false);
+  const [cobrando, setCobrando] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [filteredProducts, setFilteredProducts] = useState([]);
 
   useEffect(() => {
     if (mesaId) {
@@ -88,6 +90,7 @@ const [cobrando, setCobrando] = useState(false);
 
       setProducts(prods);
       setLoading(false);
+      setFilteredProducts(prods);
     });
 
     return () => unsubscribe();
@@ -599,8 +602,12 @@ const [cobrando, setCobrando] = useState(false);
         </div>
 
         <div className={styles.productosPanel}>
+          <Buscador
+            productos={products}
+            onResultados={setFilteredProducts}
+          />
           <div className={styles.productContainer}>
-            {products.map((prod) => (
+            {filteredProducts.map((prod) => (
               <CardProduct
                 key={prod.id}
                 id={prod.id}
