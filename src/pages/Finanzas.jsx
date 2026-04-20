@@ -115,7 +115,7 @@ export const Finanzas = () => {
 
   // 🔥 CAJA REAL
   const cajaReal =
-  aperturaTotal + totalGeneral - egresos - retiros;
+    aperturaTotal + totalGeneral + ingresos - egresos - retiros;
 
   return (
     <div className={styles.container}>
@@ -136,7 +136,9 @@ export const Finanzas = () => {
         <div className={styles.totalBox}>
           <p>Ventas: {formatARS(totalGeneral)}</p>
           <p>Apertura: {formatARS(aperturaTotal)}</p>
-          <p>Retiros: {formatARS(-retiros)}</p>
+          <p>Ingresos: {formatARS(ingresos)}</p>
+          <p>Egresos: -{formatARS(egresos)}</p>
+          <p>Retiros: -{formatARS(retiros)}</p>
           <h3>Caja real: {formatARS(cajaReal)}</h3>
         </div>
       </div>

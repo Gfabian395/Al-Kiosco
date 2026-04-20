@@ -132,106 +132,164 @@ export const Perfil = () => {
     alert(`💸 Retiro registrado: $${monto}`);
   };
 
-  // 🟢 INICIAR TURNO
   const iniciarTurno = async () => {
-    if (!userAuth || !userData) return;
+  if (!userAuth || !userData) return;
 
-    if (turno) {
-      alert("⚠️ Ya hay un turno activo");
-      return;
-    }
+  if (turno) {
+    alert("⚠️ Ya hay un turno activo");
+    return;
+  }
 
-    if (esAdmin && cajaInicial <= 0) {
-      alert("⚠️ Debes ingresar una caja inicial mayor a 0");
-      return;
-    }
+  if (esAdmin && cajaInicial <= 0) {
+    alert("⚠️ Debes ingresar una caja inicial mayor a 0");
+    return;
+  }
 
-    const { fecha, hora } = getFechaHora();
+  const { fecha, hora } = getFechaHora();
 
-    const nuevoTurno = {
-      userId: userAuth.uid,
-      nombre: userData.name,
-      email: userData.email,
-      rol: userData.role,
-      inicio: serverTimestamp(),
-      fin: null,
-      cajaInicial: esAdmin ? cajaInicial : 0,
-      cajaFinal: 0,
-      activo: true,
-    };
-
-    const docRef = await addDoc(collection(db, "turnos"), nuevoTurno);
-
-    await addDoc(collection(db, "movimientosCaja"), {
-      tipo: "apertura",
-      monto: esAdmin ? cajaInicial : 0,
-      descripcion: "Inicio de turno",
-      userId: userAuth.uid,
-      userName: userData.name,
-      turnoId: docRef.id,
-      fecha,
-      hora,
-      createdAt: serverTimestamp(),
-    });
-
-    setTurno({ id: docRef.id, ...nuevoTurno });
-
-    alert(`🟢 Turno iniciado`);
+  const nuevoTurno = {
+    userId: userAuth.uid,
+    nombre: userData.name,
+    email: userData.email,
+    rol: userData.role,
+    inicio: serverTimestamp(),
+    fin: null,
+    cajaInicial: esAdmin ? cajaInicial : 0,
+    cajaFinal: 0,
+    activo: true,
   };
 
-  // 🔴 FINALIZAR TURNO
+  const docRef = await addDoc(collection(db, "turnos"), nuevoTurno);
+
+  await addDoc(collection(db, "movimientosCaja"), {
+    tipo: "apertura",
+    monto: esAdmin ? cajaInicial : 0,
+    descripcion: "Inicio de turno",
+    userId: userAuth.uid,
+    userName: userData.name,
+    turnoId: docRef.id,
+    fecha,
+    hora,
+    createdAt: serverTimestamp(),
+  });
+
+  setTurno({ id: docRef.id, ...nuevoTurno });
+
+  // 🧾 IMPRIMIR TICKET APERTURA
+  imprimirTicket("inicio", {
+    nombre: userData.name,
+    email: userData.email,
+    rol: userData.role,
+    cajaInicial: esAdmin ? cajaInicial : 0,
+    fecha,
+    hora,
+  });
+
+  alert(`🟢 Turno iniciado`);
+};
+
   const finalizarTurno = async () => {
-    if (!turno) {
-      alert("⚠️ No hay turno activo");
-      return;
-    }
+  if (!turno) {
+    alert("⚠️ No hay turno activo");
+    return;
+  }
 
-    const { fecha, hora } = getFechaHora();
+  const { fecha, hora } = getFechaHora();
 
-    const refTurno = doc(db, "turnos", turno.id);
+  const refTurno = doc(db, "turnos", turno.id);
 
-    const ganancia =
-      totalCaja - Number(turno.cajaInicial || 0);
+  const ganancia = totalCaja;
+  const totalFinal = Number(turno.cajaInicial || 0) + totalCaja;
 
-    await updateDoc(refTurno, {
-      fin: serverTimestamp(),
-      cajaFinal: totalCaja,
-      activo: false,
-    });
+  await updateDoc(refTurno, {
+    fin: serverTimestamp(),
+    cajaFinal: totalCaja,
+    activo: false,
+  });
 
-    await addDoc(collection(db, "movimientosCaja"), {
-      tipo: "cierre",
-      monto: totalCaja,
-      ganancia,
-      descripcion: "Cierre de turno",
-      userId: userAuth.uid,
-      userName: userData.name,
-      turnoId: turno.id,
-      fecha,
-      hora,
-      createdAt: serverTimestamp(),
-    });
+  await addDoc(collection(db, "movimientosCaja"), {
+    tipo: "cierre",
+    monto: totalFinal,
+    ganancia,
+    descripcion: "Cierre de turno",
+    userId: userAuth.uid,
+    userName: userData.name,
+    turnoId: turno.id,
+    fecha,
+    hora,
+    createdAt: serverTimestamp(),
+  });
 
-    await addDoc(collection(db, "cajaDiaria"), {
-      fecha,
-      inicioCaja: turno.cajaInicial,
-      cierreCaja: totalCaja,
-      ventas: ganancia,
-      userId: userAuth.uid,
-      userName: userData.name,
-      turnoId: turno.id,
-      createdAt: serverTimestamp(),
-    });
+  await addDoc(collection(db, "cajaDiaria"), {
+    fecha,
+    inicioCaja: turno.cajaInicial,
+    cierreCaja: totalFinal,
+    ventas: totalCaja,
+    userId: userAuth.uid,
+    userName: userData.name,
+    turnoId: turno.id,
+    createdAt: serverTimestamp(),
+  });
 
-    setTurno(null);
-    setTotalCaja(0);
-    setCajaInicialManual(0);
+  // 🧾 IMPRIMIR TICKET CIERRE (ANTES de limpiar estado)
+  imprimirTicket("cierre", {
+    nombre: userData.name,
+    email: userData.email,
+    rol: userData.role,
+    cajaInicial: turno.cajaInicial,
+    ventas: totalCaja,
+    total: totalFinal,
+    fecha,
+    hora,
+  });
 
-    alert(`🔴 Turno cerrado`);
-  };
+  setTurno(null);
+  setTotalCaja(0);
+  setCajaInicialManual(0);
 
-  const diferencia =
-    totalCaja - Number(turno?.cajaInicial || 0);
+  alert(`🔴 Turno cerrado`);
+};
+
+  const cajaActual =
+    Number(turno?.cajaInicial || 0) + totalCaja;
+
+    const imprimirTicket = (tipo, data) => {
+  const contenido = `
+    <html>
+      <body style="font-family: monospace; padding: 10px;">
+        <h3>${tipo === "inicio" ? "APERTURA DE TURNO" : "CIERRE DE TURNO"}</h3>
+        <hr/>
+
+        <p><b>Empleado:</b> ${data.nombre}</p>
+        <p><b>Email:</b> ${data.email}</p>
+        <p><b>Rol:</b> ${data.rol}</p>
+
+        <p><b>Fecha:</b> ${data.fecha}</p>
+        <p><b>Hora:</b> ${data.hora}</p>
+
+        <hr/>
+
+        ${
+          tipo === "inicio"
+            ? `<p><b>Caja inicial:</b> $${data.cajaInicial}</p>`
+            : `
+              <p><b>Caja inicial:</b> $${data.cajaInicial}</p>
+              <p><b>Ventas:</b> $${data.ventas}</p>
+              <p><b>Total en caja:</b> $${data.total}</p>
+            `
+        }
+
+        <hr/>
+        <p>------------------------------</p>
+      </body>
+    </html>
+  `;
+
+  const ventana = window.open("", "", "width=300,height=600");
+  ventana.document.write(contenido);
+  ventana.document.close();
+  ventana.print();
+};
 
   return (
     <div className={styles.container}>
@@ -263,7 +321,11 @@ export const Perfil = () => {
             </p>
 
             <p>
-              Generado: {formatARS(diferencia)}
+              Ventas: {formatARS(totalCaja)}
+            </p>
+
+            <p>
+              Caja actual: {formatARS(cajaActual)}
             </p>
           </>
         )}
