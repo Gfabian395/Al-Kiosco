@@ -9,6 +9,7 @@ import SelectMesa from "../components/SelectMesa";
 import { useCart } from "../context/CartContext";
 import styles from "../components/styles/Productos.module.css";
 import logo from "../assets/LaPancheria.png";
+import { query, where } from "firebase/firestore";
 
 export const Productos = () => {
   const { categoryId } = useParams();
@@ -34,13 +35,13 @@ export const Productos = () => {
   const [modalPagoOpen, setModalPagoOpen] = useState(false);
   const [pago, setPago] = useState("");
   const [vuelto, setVuelto] = useState(0);
-
+  const [turno, setTurno] = useState(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [ingredients, setIngredients] = useState("");
   const [price, setPrice] = useState("");
   const [imageFile, setImageFile] = useState(null);
-
+const [cobrando, setCobrando] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -109,6 +110,30 @@ export const Productos = () => {
 
     return () => unsubscribe();
   }, [mesaId]);
+
+  useEffect(() => {
+    const obtenerTurno = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const q = query(
+        collection(db, "turnos"),
+        where("userId", "==", user.uid),
+        where("activo", "==", true)
+      );
+
+      const res = await getDocs(q);
+
+      if (!res.empty) {
+        setTurno({
+          id: res.docs[0].id,
+          ...res.docs[0].data(),
+        });
+      }
+    };
+
+    obtenerTurno();
+  }, []);
 
   // 🔹 modal producto
   const openProductModal = () => setModalProductOpen(true);
@@ -248,21 +273,31 @@ export const Productos = () => {
   const handleCobrar = async () => {
     if (!mesaData) return;
 
+    const pagoNum = parseFloat(pago);
+
+    // 🔴 VALIDACIONES ANTES
+    if (isNaN(pagoNum) || pagoNum <= 0) {
+      alert("Ingresá un pago válido");
+      return;
+    }
+
+    if (pagoNum < total) {
+      alert("El pago es menor al total");
+      return;
+    }
+
+    if (!turno) {
+      alert("No hay turno activo");
+      return;
+    }
+
+    // 🔒 evitar doble cobro
+    if (cobrando) return;
+    setCobrando(true);
+
     try {
-      const pagoNum = parseFloat(pago);
-
-      if (isNaN(pagoNum) || pagoNum <= 0) {
-        alert("Ingresá un pago válido");
-        return;
-      }
-
-      if (pagoNum < total) {
-        alert("El pago es menor al total");
-        return;
-      }
-
       const items = cart.map((p) => ({
-        id: p.productId,
+        id: p.productId || p.id,
         categoryId: p.categoryId,
         name: p.name ?? "",
         price: Number(p.price ?? 0),
@@ -270,14 +305,19 @@ export const Productos = () => {
         total: Number(p.total ?? (p.price ?? 0) * (p.quantity ?? 1)),
       }));
 
+      // 🔴 VALIDACIÓN FUERTE
+      for (const item of items) {
+        if (!item.id || !item.categoryId) {
+          throw new Error(`Item inválido: ${item.name}`);
+        }
+      }
+
       const now = new Date();
 
-      // 🔥 TRANSACTION
       await runTransaction(db, async (transaction) => {
         const refs = [];
         const snaps = [];
 
-        // 🔵 FASE 1: SOLO LECTURAS
         for (const item of items) {
           const productRef = doc(
             db,
@@ -297,7 +337,6 @@ export const Productos = () => {
           snaps.push(snap);
         }
 
-        // 🔴 FASE 2: SOLO ESCRITURAS
         for (let i = 0; i < refs.length; i++) {
           const { ref, item } = refs[i];
           const snap = snaps[i];
@@ -318,7 +357,9 @@ export const Productos = () => {
         }
       });
 
-      // 🔥 GUARDAR COBRO
+      // 🧾 imprimir ticket
+      imprimirTicket(mesaData, cart);
+
       await addDoc(collection(db, "cobros"), {
         mesa: mesaData.numero ?? "Sin mesa",
         sector: mesaData.sector ?? "Sin sector",
@@ -330,6 +371,7 @@ export const Productos = () => {
         items,
         userId: auth.currentUser?.uid ?? null,
         userName: userData?.name ?? "Empleado",
+        turnoId: turno?.id ?? null,
         createdAt: new Date(),
       });
 
@@ -345,6 +387,8 @@ export const Productos = () => {
     } catch (error) {
       console.error("❌ Error cobrando:", error);
       alert(error.message || "Error al cobrar");
+    } finally {
+      setCobrando(false);
     }
   };
 
